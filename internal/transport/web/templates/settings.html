@@ -1,0 +1,21 @@
+{{define "content"}}
+<section class="settings">
+  <h2>設定</h2>
+  {{if .FlashOK}}<p class="flash ok">{{.FlashOK}}</p>{{end}}
+  {{if .FlashError}}<p class="flash error">{{.FlashError}}</p>{{end}}
+  <article class="card">
+    <h3>パスワード変更</h3>
+    <form method="post" action="/settings/password" class="form">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <label>現在のパスワード
+        <input name="current" type="password" required autocomplete="current-password">
+      </label>
+      <label>新しいパスワード
+        <input name="new" type="password" required minlength="12" autocomplete="new-password">
+      </label>
+      <button class="btn" type="submit">変更</button>
+    </form>
+    <p class="muted">変更後、他デバイスのセッションは無効になります。</p>
+  </article>
+</section>
+{{end}}

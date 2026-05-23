@@ -1,0 +1,31 @@
+{{define "content"}}
+<section class="history">
+  <h2>履歴</h2>
+  {{if .Attempts}}
+  <form method="post" action="/history/clear" class="inline">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+    <button class="btn danger" type="submit" onclick="return confirm('すべての履歴と SRS 状態を削除します。よろしいですか？')">すべて削除</button>
+  </form>
+  <table class="tbl">
+    <thead><tr><th>日時 (UTC)</th><th>正誤</th><th>所要 (ms)</th><th></th></tr></thead>
+    <tbody>
+    {{range .Attempts}}
+    <tr>
+      <td>{{.AnsweredAt.Format "2006-01-02 15:04:05"}}</td>
+      <td>{{if .IsCorrect}}<span class="ok">正</span>{{else}}<span class="ng">誤</span>{{end}}</td>
+      <td>{{.DurationMs}}</td>
+      <td>
+        <form method="post" action="/history/{{.ID}}/delete" class="inline">
+          <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+          <button class="link" type="submit" onclick="return confirm('この履歴を削除しますか？')">削除</button>
+        </form>
+      </td>
+    </tr>
+    {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="muted">履歴はまだありません。</p>
+  {{end}}
+</section>
+{{end}}

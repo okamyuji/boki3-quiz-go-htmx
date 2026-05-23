@@ -1,0 +1,13 @@
+{{define "content"}}
+<section class="progress">
+  <h2>進捗</h2>
+  <article class="card">
+    <h3>日次正解率</h3>
+    {{.DailyChartSVG}}
+  </article>
+  <article class="card">
+    <h3>論点別正解率</h3>
+    {{.TopicBarsSVG}}
+  </article>
+</section>
+{{end}}

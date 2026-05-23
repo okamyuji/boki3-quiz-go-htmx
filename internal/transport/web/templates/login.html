@@ -1,0 +1,17 @@
+{{define "content"}}
+<section class="auth-card">
+  <h2>ログイン</h2>
+  {{if .FlashError}}<p class="flash error">{{.FlashError}}</p>{{end}}
+  <form method="post" action="/login" class="form">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+    <label>ユーザー名
+      <input name="username" required minlength="3" maxlength="32" autocomplete="username">
+    </label>
+    <label>パスワード
+      <input name="password" type="password" required minlength="12" autocomplete="current-password">
+    </label>
+    <button class="btn" type="submit">ログイン</button>
+  </form>
+  <p class="muted">アカウントが無い場合は <a href="/register">新規登録</a></p>
+</section>
+{{end}}

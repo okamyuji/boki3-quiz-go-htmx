@@ -1,0 +1,17 @@
+{{define "content"}}
+<section class="answer">
+  <h2 class="result {{if .Correct}}ok{{else}}ng{{end}}">{{if .Correct}}正解！{{else}}不正解{{end}}</h2>
+  <article class="card">
+    <h3>解説</h3>
+    <p>{{.Explanation}}</p>
+  </article>
+  <article class="card">
+    <h3>次回出題予定</h3>
+    <p>{{.NextDueAt.Format "2006-01-02"}}</p>
+  </article>
+  <div class="actions">
+    <a class="btn" href="/quiz?set={{.ActiveSet}}&mode={{.Mode}}">次の問題へ</a>
+    <a class="btn ghost" href="/progress">進捗を見る</a>
+  </div>
+</section>
+{{end}}

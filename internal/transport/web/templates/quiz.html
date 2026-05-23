@@ -1,0 +1,59 @@
+{{define "content"}}
+<section class="quiz">
+  <header class="quiz-head">
+    <h2>学習</h2>
+    <form method="get" action="/quiz" class="inline-form">
+      <label>セット
+        <select name="set">
+          {{range .Sets}}
+          <option value="{{.Code}}" {{if eq .Code $.ActiveSet}}selected{{end}}>{{.Name}}</option>
+          {{end}}
+        </select>
+      </label>
+      <label>モード
+        <select name="mode">
+          <option value="srs"{{if eq .Mode "srs"}} selected{{end}}>復習優先 (SRS)</option>
+          <option value="sequential"{{if eq .Mode "sequential"}} selected{{end}}>順序通り</option>
+          <option value="random"{{if eq .Mode "random"}} selected{{end}}>ランダム</option>
+        </select>
+      </label>
+      <button class="btn ghost" type="submit">切替</button>
+    </form>
+  </header>
+  {{if .Question}}
+  <article class="question" x-data="{ submitted: false }">
+    <p class="meta">論点: {{.TopicName}}</p>
+    <h3 class="prompt">{{.Question.Prompt}}</h3>
+    <form method="post" action="/quiz/answer" class="form" x-on:submit="submitted=true">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <input type="hidden" name="question_id" value="{{.Question.ID}}">
+      <input type="hidden" name="set" value="{{.ActiveSet}}">
+      <input type="hidden" name="started_at" value="{{.StartedAtMs}}">
+      {{if eq .Question.QuestionType "journal"}}
+      <fieldset class="entries">
+        <legend>借方</legend>
+        <input name="debit_account_1" placeholder="勘定科目 1">
+        <input name="debit_amount_1" type="number" min="0" placeholder="金額">
+        <input name="debit_account_2" placeholder="勘定科目 2 (任意)">
+        <input name="debit_amount_2" type="number" min="0" placeholder="金額">
+      </fieldset>
+      <fieldset class="entries">
+        <legend>貸方</legend>
+        <input name="credit_account_1" placeholder="勘定科目 1">
+        <input name="credit_amount_1" type="number" min="0" placeholder="金額">
+        <input name="credit_account_2" placeholder="勘定科目 2 (任意)">
+        <input name="credit_amount_2" type="number" min="0" placeholder="金額">
+      </fieldset>
+      {{else}}
+      <label>答え
+        <input name="choice" placeholder="解答" autocomplete="off">
+      </label>
+      {{end}}
+      <button class="btn" type="submit" x-bind:disabled="submitted">採点</button>
+    </form>
+  </article>
+  {{else}}
+  <p class="muted">このセットには問題がありません。</p>
+  {{end}}
+</section>
+{{end}}

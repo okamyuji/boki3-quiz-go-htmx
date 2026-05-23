@@ -1,0 +1,17 @@
+{{define "content"}}
+<section class="auth-card">
+  <h2>新規登録</h2>
+  {{if .FlashError}}<p class="flash error">{{.FlashError}}</p>{{end}}
+  <form method="post" action="/register" class="form">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+    <label>ユーザー名 (3〜32 文字、英数 _ -)
+      <input name="username" required minlength="3" maxlength="32" autocomplete="username" pattern="[A-Za-z0-9_\-]+">
+    </label>
+    <label>パスワード (12 文字以上、英大小数記号のうち3種)
+      <input name="password" type="password" required minlength="12" autocomplete="new-password">
+    </label>
+    <button class="btn" type="submit">登録</button>
+  </form>
+  <p class="muted"><a href="/login">ログインに戻る</a></p>
+</section>
+{{end}}

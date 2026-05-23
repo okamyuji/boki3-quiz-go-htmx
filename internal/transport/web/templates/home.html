@@ -1,0 +1,34 @@
+{{define "content"}}
+<section class="hero">
+  <h2 class="hero-h">日商簿記3級を、紙のリズムで。</h2>
+  <p class="hero-p">仕訳・勘定記入・財務諸表の3層を、間隔反復で記憶へ。</p>
+  {{if .User}}
+    <a class="btn" href="/quiz">学習を始める</a>
+  {{else}}
+    <div class="cta-row">
+      <a class="btn" href="/login">ログイン</a>
+      <a class="btn ghost" href="/register">新規登録</a>
+    </div>
+  {{end}}
+</section>
+{{if .Summary}}
+<section class="grid summary">
+  <article class="card">
+    <h3>累計試行</h3>
+    <p class="num">{{.Summary.TotalAttempts}}</p>
+  </article>
+  <article class="card">
+    <h3>累計正解</h3>
+    <p class="num">{{.Summary.TotalCorrect}}</p>
+  </article>
+  <article class="card">
+    <h3>正解率</h3>
+    <p class="num">{{printf "%.1f" (mul .Summary.OverallRate 100.0)}}%</p>
+  </article>
+  <article class="card">
+    <h3>復習待ち</h3>
+    <p class="num">{{.Summary.DueCount}}</p>
+  </article>
+</section>
+{{end}}
+{{end}}
