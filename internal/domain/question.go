@@ -84,3 +84,11 @@ type QuestionFilter struct {
 	Limit      int
 	Offset     int
 }
+
+// SubmitInput は QuizService.Submit への入力。
+type SubmitInput struct {
+	QuestionID int64
+	SetCode    string
+	Answer     AnswerPayload
+	DurationMs int
+}
