@@ -1,0 +1,18 @@
+# gitleaks 8.30.x config
+# 既定ルールに加え、本リポジトリ固有の許可リストを定義する。
+title = "boki3-quiz-go-htmx gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "テスト用ダミー資格情報を gitleaks の検出対象から除外する"
+paths = [
+  '''(?i)tests/.*''',
+  '''(?i)docs/.*''',
+]
+
+# テスト用に JWT のサンプルが含まれることを許容する (実シークレットは含めない)
+regexes = [
+  '''eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}''',
+]
