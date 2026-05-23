@@ -1,0 +1,24 @@
+# Go
+/bin/
+*.test
+*.out
+
+# OS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# Local config / secrets
+.env
+.env.local
+config.yaml
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Build artifacts
+coverage.txt
+coverage.html
