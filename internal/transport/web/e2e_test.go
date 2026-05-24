@@ -83,6 +83,7 @@ func setupE2E(t *testing.T) *e2eFixture {
 		LoginRateLimit:  ratelimit.NewFixedWindow(100, time.Minute, clk),
 		GlobalRateLimit: ratelimit.NewSlidingWindow(1000, time.Minute, clk),
 		Cookie:          web.CookieConfig{SessionName: "boki3_session", CSRFName: "boki3_csrf"},
+		StartedAtSecret: []byte("test-started-at-secret-32bytes-pad"),
 	})
 	webH.Register(mux)
 	apiH := api.NewHandler(api.Config{

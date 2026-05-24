@@ -107,7 +107,8 @@ func run() error {
 		Auth:      authSvc, Quiz: quizSvc, Stats: statsSvc,
 		Sets: sets, Questions: questions, Logger: logger,
 		LoginRateLimit: loginRL, GlobalRateLimit: globalRL,
-		Cookie: cookieCfg,
+		Cookie:          cookieCfg,
+		StartedAtSecret: jwtSecret, // JWT 秘密と同じ秘密を流用 (どちらも環境変数管理)
 	})
 	webH.Register(mux)
 	apiH := api.NewHandler(api.Config{
@@ -245,8 +246,10 @@ func splitEnv(key string) []string {
 	return out
 }
 
-// loadJWTSecret は BOKI3_JWT_SECRET (hex 64+ 文字) を読む。未設定なら起動時に 32 バイトを乱数生成する。
-// 生成した場合は警告ログを出す (本番では設定必須)。
+// loadJWTSecret は BOKI3_JWT_SECRET (hex 64+ 文字) を読む。
+//   - 値が設定されていれば hex デコードして使う (32 バイト未満は拒否)
+//   - 未設定かつ BOKI3_ENV=production の場合は起動を失敗させる (fail-fast)
+//   - 未設定かつ dev の場合は乱数生成し警告ログを出す (再起動でトークン無効化)
 func loadJWTSecret(envVal string) ([]byte, error) {
 	if envVal != "" {
 		b, err := hex.DecodeString(envVal)
@@ -257,6 +260,9 @@ func loadJWTSecret(envVal string) ([]byte, error) {
 			return nil, errors.New("BOKI3_JWT_SECRET must be >= 32 bytes")
 		}
 		return b, nil
+	}
+	if strings.EqualFold(os.Getenv("BOKI3_ENV"), "production") {
+		return nil, errors.New("BOKI3_JWT_SECRET must be set in production (generate with: openssl rand -hex 32)")
 	}
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {

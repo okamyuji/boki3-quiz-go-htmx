@@ -29,6 +29,7 @@
       <input type="hidden" name="question_id" value="{{.Question.ID}}">
       <input type="hidden" name="set" value="{{.ActiveSet}}">
       <input type="hidden" name="started_at" value="{{.StartedAtMs}}">
+      <input type="hidden" name="started_sig" value="{{.StartedAtSig}}">
       {{if eq .Question.QuestionType "journal"}}
       <fieldset class="entries">
         <legend>借方</legend>

@@ -28,12 +28,18 @@ const Driver = "sqlite"
 //   - synchronous=NORMAL
 //
 // dsn は modernc.org/sqlite の DSN 文字列 (例 "file:app.db" や "file:/tmp/x.db")。
+// 後方互換のため context は OpenContext を使い、Open は Background をデフォルトとする。
 func Open(dsn string) (*sql.DB, error) {
+	return OpenContext(context.Background(), dsn)
+}
+
+// OpenContext は ctx を尊重して Open する。PRAGMA 実行のキャンセル/タイムアウト用。
+func OpenContext(ctx context.Context, dsn string) (*sql.DB, error) {
 	db, err := sql.Open(Driver, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("sqlitex.Open: %w", err)
 	}
-	if err := ApplyPragmas(context.Background(), db); err != nil {
+	if err := ApplyPragmas(ctx, db); err != nil {
 		_ = db.Close()
 		return nil, err
 	}

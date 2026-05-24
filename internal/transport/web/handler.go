@@ -1,7 +1,9 @@
 package web
 
 import (
+	"crypto/hmac"
 	cryptorand "crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"html/template"
@@ -29,6 +31,31 @@ type Config struct {
 	LoginRateLimit  port.RateLimiter
 	GlobalRateLimit port.RateLimiter
 	Cookie          CookieConfig
+	// StartedAtSecret は started_at の HMAC 署名に使う鍵。32 バイト以上推奨。
+	StartedAtSecret []byte
+}
+
+// signStartedAt は (questionID, ms) を HMAC-SHA256 して hex で返す。
+func (h *Handler) signStartedAt(questionID, ms int64) string {
+	mac := hmac.New(sha256.New, h.cfg.StartedAtSecret)
+	_, _ = mac.Write([]byte(strconv.FormatInt(questionID, 10) + ":" + strconv.FormatInt(ms, 10)))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// verifyStartedAt は started_at と署名の組を検証する。窓 [now-5min, now+10sec] 外も拒否する。
+func (h *Handler) verifyStartedAt(questionID, ms int64, sig string, now time.Time) bool {
+	expected := h.signStartedAt(questionID, ms)
+	if !hmac.Equal([]byte(expected), []byte(sig)) {
+		return false
+	}
+	delta := now.UnixMilli() - ms
+	const maxAgeMs = int64(5 * 60 * 1000) // 5 分
+	const futureDriftMs = int64(10 * 1000) // 10 秒
+	if delta < -futureDriftMs || delta > maxAgeMs {
+		// 過去 5 分以内、未来 10 秒以内のみ許容 (時計ドリフト想定)
+		return false
+	}
+	return true
 }
 
 // CookieConfig は cookie 名と属性。
@@ -83,12 +110,13 @@ type view struct {
 	FlashOK    string
 	Summary    *domain.StatsSummary
 	// quiz
-	Sets        []domain.QuestionSet
-	ActiveSet   string
-	Mode        string
-	Question    *domain.Question
-	TopicName   string
-	StartedAtMs int64
+	Sets         []domain.QuestionSet
+	ActiveSet    string
+	Mode         string
+	Question     *domain.Question
+	TopicName    string
+	StartedAtMs  int64
+	StartedAtSig string // started_at の HMAC-SHA256 (改ざん検知)
 	// answer
 	Correct     bool
 	Explanation string
@@ -224,6 +252,7 @@ func (h *Handler) getQuiz(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		v.Question = question
 		v.StartedAtMs = time.Now().UnixMilli()
+		v.StartedAtSig = h.signStartedAt(question.ID, v.StartedAtMs)
 	}
 	h.render(w, "quiz", v)
 }
@@ -237,7 +266,13 @@ func (h *Handler) postQuizAnswer(w http.ResponseWriter, r *http.Request) {
 	qid, _ := strconv.ParseInt(r.FormValue("question_id"), 10, 64)
 	setCode := r.FormValue("set")
 	startedAt, _ := strconv.ParseInt(r.FormValue("started_at"), 10, 64)
-	dur := max(int(time.Now().UnixMilli()-startedAt), 0)
+	startedSig := r.FormValue("started_sig")
+	now := time.Now()
+	dur := max(int(now.UnixMilli()-startedAt), 0)
+	if !h.verifyStartedAt(qid, startedAt, startedSig, now) {
+		// 改ざんまたは古すぎる/未来すぎる: SRS grading が歪まないよう中央値 (8s) として扱う
+		dur = 8000
+	}
 	question, err := h.cfg.Questions.GetByID(r.Context(), qid)
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)

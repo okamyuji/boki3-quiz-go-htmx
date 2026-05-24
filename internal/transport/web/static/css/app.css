@@ -250,6 +250,13 @@ a:focus-visible {
 .answer .result { font-family: var(--font-serif); font-size: var(--text-h1); }
 .answer .ok { color: oklch(48% 0.16 150); }
 .answer .ng { color: var(--color-vermilion); }
+.actions {
+  display: flex;
+  gap: var(--space-md);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: var(--space-md);
+}
 
 .tbl { width: 100%; border-collapse: collapse; }
 .tbl th, .tbl td { padding: var(--space-sm) var(--space-md); text-align: left; border-bottom: 1px solid var(--color-line); }
