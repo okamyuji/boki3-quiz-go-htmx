@@ -65,7 +65,7 @@ func (h *Handler) verifyStartedAt(questionID, ms int64, sig string, now time.Tim
 		return false
 	}
 	delta := now.UnixMilli() - ms
-	const maxAgeMs = int64(5 * 60 * 1000) // 5 分
+	const maxAgeMs = int64(5 * 60 * 1000)  // 5 分
 	const futureDriftMs = int64(10 * 1000) // 10 秒
 	if delta < -futureDriftMs || delta > maxAgeMs {
 		// 過去 5 分以内、未来 10 秒以内のみ許容 (時計ドリフト想定)
