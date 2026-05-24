@@ -1,0 +1,5 @@
+[
+  {"code": "core_300",          "name": "コア300", "description": "頻出論点を網羅した基本300問", "target_size": 300},
+  {"code": "journal_240",       "name": "仕訳240", "description": "仕訳に特化した240問",       "target_size": 240},
+  {"code": "comprehensive_300", "name": "総合300", "description": "総合問題と決算整理を含む300問", "target_size": 300}
+]

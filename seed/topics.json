@@ -1,0 +1,17 @@
+[
+  {"code": "cash",         "name": "現金預金",       "ord": 1},
+  {"code": "receivable",   "name": "売掛金・買掛金",   "ord": 2},
+  {"code": "notes",        "name": "手形",           "ord": 3},
+  {"code": "merch_sale",   "name": "商品売買",       "ord": 4},
+  {"code": "inventory",    "name": "商品有高帳・棚卸", "ord": 5},
+  {"code": "fixed_asset",  "name": "固定資産",       "ord": 6},
+  {"code": "loans",        "name": "貸付金・借入金",   "ord": 7},
+  {"code": "other_recv",   "name": "その他債権債務",   "ord": 8},
+  {"code": "tax",          "name": "税金",           "ord": 9},
+  {"code": "wages",        "name": "給与・賞与",     "ord": 10},
+  {"code": "capital",      "name": "資本",           "ord": 11},
+  {"code": "adjustment",   "name": "決算整理",       "ord": 12},
+  {"code": "trial_balance","name": "試算表",         "ord": 13},
+  {"code": "worksheet",    "name": "精算表・財務諸表", "ord": 14},
+  {"code": "slip",         "name": "伝票",           "ord": 15}
+]
