@@ -17,13 +17,13 @@ import (
 
 // Config は API ハンドラの構築引数。
 type Config struct {
-	Auth         port.AuthService
-	API          port.APIAuthService
-	Quiz         port.QuizService
-	Stats        port.StatsService
-	Questions    port.QuestionRepository
-	Logger       *slog.Logger
-	TokenTTL     time.Duration
+	Auth          port.AuthService
+	API           port.APIAuthService
+	Quiz          port.QuizService
+	Stats         port.StatsService
+	Questions     port.QuestionRepository
+	Logger        *slog.Logger
+	TokenTTL      time.Duration
 	UserRateLimit port.RateLimiter
 }
 

@@ -177,4 +177,3 @@ func htmlEscape(s string) string {
 	)
 	return r.Replace(s)
 }
-

@@ -13,16 +13,16 @@ import (
 
 // Question は seed JSON 用の DTO (domain.Question より広めの公開項目)。
 type Question struct {
-	Code         string                 `json:"code"`
-	TopicCode    string                 `json:"topic_code"`
-	QuestionType string                 `json:"question_type"`
-	Difficulty   int                    `json:"difficulty"`
-	Prompt       string                 `json:"prompt"`
-	Payload      map[string]any         `json:"payload"`
-	Answer       domain.AnswerPayload   `json:"answer"`
-	Explanation  string                 `json:"explanation"`
-	References   []string               `json:"references"`
-	Sets         []string               `json:"sets"` // 所属するセット code
+	Code         string               `json:"code"`
+	TopicCode    string               `json:"topic_code"`
+	QuestionType string               `json:"question_type"`
+	Difficulty   int                  `json:"difficulty"`
+	Prompt       string               `json:"prompt"`
+	Payload      map[string]any       `json:"payload"`
+	Answer       domain.AnswerPayload `json:"answer"`
+	Explanation  string               `json:"explanation"`
+	References   []string             `json:"references"`
+	Sets         []string             `json:"sets"` // 所属するセット code
 }
 
 // Generate は問題セット全体を返す。
