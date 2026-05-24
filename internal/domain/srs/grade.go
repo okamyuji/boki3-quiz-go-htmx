@@ -23,7 +23,8 @@ func GradeFromResult(correct bool, durationMs int) Grade {
 		return GradeWorst
 	}
 	if durationMs < 0 {
-		durationMs = 0 // 時計の歪み等で負値が来ても 0 として扱う
+		// 時計の歪みや改ざんで負値が来た場合、Perfect に分類されると不公平になるため Good に降格。
+		return GradeGood
 	}
 	switch {
 	case durationMs < 5000:

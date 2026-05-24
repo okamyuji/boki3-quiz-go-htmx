@@ -82,7 +82,7 @@ func TestQuizSubmitCorrect(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Submit: %v", err)
 	}
-	if !g.IsCorrect {
+	if !g.IsCorrect() {
 		t.Fatalf("expected correct")
 	}
 }
@@ -110,7 +110,7 @@ func TestQuizSubmitIncorrectAndDeleteAttempt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Submit: %v", err)
 	}
-	if g.IsCorrect {
+	if g.IsCorrect() {
 		t.Fatalf("expected incorrect")
 	}
 	if err := q.DeleteAttempt(context.Background(), uid, g.Attempt.ID); err != nil {

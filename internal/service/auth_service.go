@@ -93,9 +93,14 @@ func (a *AuthService) Register(ctx context.Context, username, plain string) (*do
 
 // Login はユーザ名/パスワード検証後、新規セッションを発行する。
 // レートリミットは呼び出し側 (handler) で行う。
+//
+// 「ユーザ不在」と「パスワード不一致」を timing で区別させないために、
+// ユーザ不在の場合もダミー Verify を 1 回走らせて scrypt と同等の CPU 時間を消費する。
 func (a *AuthService) Login(ctx context.Context, username, plain, userAgent, ip string) (*domain.Session, error) {
 	u, err := a.users.FindByUsername(ctx, username)
 	if err != nil {
+		// timing 対策: 失敗時もハッシュ計算を 1 回走らせる (結果は破棄)。
+		_, _ = a.hasher.Verify(plain, dummyTimingHash, dummyTimingSalt, dummyTimingParams)
 		return nil, domain.ErrUnauthorized
 	}
 	ok, err := a.hasher.Verify(plain, u.PasswordHash, u.PasswordSalt, u.PasswordParams)
@@ -246,6 +251,13 @@ func (a *AuthService) validatePassword(p string) error {
 }
 
 // truncate は UTF-8 を壊さず先頭から max ルーンで切り詰めて返す。
+// dummyTiming* は timing-attack 緩和用のダミー値。実 hash と同じ shape (params + 同サイズ salt/hash)。
+var (
+	dummyTimingHash   = make([]byte, 32)
+	dummyTimingSalt   = make([]byte, 16)
+	dummyTimingParams = "scrypt$N=32768$r=8$p=1$keyLen=32"
+)
+
 func truncate(s string, max int) string {
 	if max <= 0 {
 		return ""

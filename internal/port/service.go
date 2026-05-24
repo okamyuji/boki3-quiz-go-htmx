@@ -20,6 +20,7 @@ type AuthService interface {
 type APIAuthService interface {
 	IssueToken(ctx context.Context, userID int64, ttl time.Duration) (token string, jti string, expiresAt time.Time, err error)
 	VerifyToken(ctx context.Context, token string) (int64, error)
+	ExtractJTI(token string) (jti string, expiresAt time.Time, err error)
 	Revoke(ctx context.Context, jti string, userID int64, expiresAt time.Time) error
 }
 

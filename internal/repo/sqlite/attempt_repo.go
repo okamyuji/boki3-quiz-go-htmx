@@ -89,7 +89,9 @@ func (r *AttemptRepo) ListByUser(ctx context.Context, userID int64, limit, offse
 }
 
 // DeleteByID は (userID, attemptID) が一致するレコードを削除する。
-// 当人のものでない attempt は no-op で ErrNotFound を返さない (列挙攻撃対策)。
+//
+// 削除対象が存在しないか他人の attempt の場合は ErrNotFound を返す。
+// 上位 (handler) は ErrNotFound と「真に存在しない」を区別せず 404 で返すことで列挙を防ぐ。
 func (r *AttemptRepo) DeleteByID(ctx context.Context, userID, attemptID int64) error {
 	res, err := r.db.ExecContext(ctx,
 		`DELETE FROM attempts WHERE id = ? AND user_id = ?`, attemptID, userID)

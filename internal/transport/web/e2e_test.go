@@ -95,7 +95,7 @@ func setupE2E(t *testing.T) *e2eFixture {
 	chain := middleware.Chain(mux,
 		middleware.Recover(logger),
 		middleware.RequestID(),
-		middleware.SecurityHeaders(),
+		middleware.SecurityHeaders(logger),
 		middleware.BodyLimit(1<<20),
 	)
 

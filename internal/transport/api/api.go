@@ -106,28 +106,15 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	auth := r.Header.Get("Authorization")
 	const prefix = "Bearer "
 	if tok, ok := strings.CutPrefix(auth, prefix); ok {
-		// VerifyToken は失効済みでも nil を返さないので、ここでは Parse 経由ではなく
-		// APIAuthService にトークン -> claims 抽出と Revoke を委ねる薄い経路を使う。
-		// 簡略化として VerifyToken で取得した userID + 残存期限を使う。
-		// (失効されたトークンは IsRevoked で再ログアウト時にも一致して問題ない)
-		uid, err := h.cfg.API.VerifyToken(r.Context(), tok)
+		// ExtractJTI は jti と exp のみ取り出す (失効リスト照合なし)。
+		jti, exp, err := h.cfg.API.ExtractJTI(tok)
 		if err == nil {
-			// API.Revoke は jti と expiresAt が必要だが、ここでは現在からトークン TTL を上限に設定する。
-			// 多重 logout でも upsert で重複なし。
-			_ = h.cfg.API.Revoke(r.Context(), bearerJTIPlaceholder(tok), uid, time.Now().Add(h.cfg.TokenTTL))
+			// 失効済みトークンでも uid は 0 で問題なし (Revoke は idempotent)。
+			uid, _ := h.cfg.API.VerifyToken(r.Context(), tok)
+			_ = h.cfg.API.Revoke(r.Context(), jti, uid, exp)
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
-}
-
-// bearerJTIPlaceholder は Authorization トークン文字列のハッシュを jti として使う近似。
-// 公式 jti が必要な場合は APIAuthService 経由で取得すべきだが、本アプリの logout は best-effort 失効。
-func bearerJTIPlaceholder(tok string) string {
-	// 単純に最初の 32 文字 (payload + signature の冒頭) を切る。
-	if len(tok) > 32 {
-		return "logout:" + tok[:32]
-	}
-	return "logout:" + tok
 }
 
 type nextResp struct {

@@ -60,9 +60,7 @@ func (r *QuestionRepo) ListBySet(ctx context.Context, setCode string) ([]domain.
 // 動的 SQL を構築するが、値はすべて ? プレースホルダで渡す (fmt.Sprintf で値を埋め込まない)。
 func (r *QuestionRepo) Search(ctx context.Context, filter domain.QuestionFilter) ([]domain.Question, error) {
 	var sb strings.Builder
-	sb.WriteString(`SELECT q.id, q.code, q.topic_id, q.question_type, q.difficulty,
-		q.prompt, q.payload_json, q.answer_json, q.explanation, COALESCE(q.references_json, ''), q.created_at
-		FROM questions q`)
+	sb.WriteString(selectQuestionBaseSQL)
 
 	args := make([]any, 0)
 	conds := make([]string, 0)

@@ -135,7 +135,7 @@ func run() error {
 		middleware.Recover(logger),
 		middleware.RequestID(),
 		middleware.AccessLog(logger),
-		middleware.SecurityHeaders(),
+		middleware.SecurityHeaders(logger),
 		middleware.BodyLimit(1<<20),
 		middleware.RateLimitByIP(globalRL),
 		middleware.CORS(middleware.CORSConfig{

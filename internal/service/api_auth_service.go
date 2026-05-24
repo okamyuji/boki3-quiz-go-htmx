@@ -83,3 +83,13 @@ func (a *APIAuthService) VerifyToken(ctx context.Context, token string) (int64, 
 func (a *APIAuthService) Revoke(ctx context.Context, jti string, userID int64, expiresAt time.Time) error {
 	return a.jwts.Revoke(ctx, jti, userID, expiresAt)
 }
+
+// ExtractJTI はトークンをパースし jti と expiresAt を返す。
+// 署名は検証するが、失効リスト照合はしない (logout 用)。
+func (a *APIAuthService) ExtractJTI(token string) (string, time.Time, error) {
+	c, err := a.signer.Parse(token)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return c.JTI, c.ExpiresAt, nil
+}

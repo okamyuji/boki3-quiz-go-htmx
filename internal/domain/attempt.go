@@ -46,9 +46,12 @@ type StatsSummary struct {
 }
 
 // GradedAttempt は Submit の戻り。
+// IsCorrect は Attempt.IsCorrect で参照する (重複保持しない)。
 type GradedAttempt struct {
 	Attempt     Attempt
-	IsCorrect   bool
 	Explanation string
 	NextDueAt   time.Time
 }
+
+// IsCorrect は埋め込み Attempt の IsCorrect を返すショートカット。
+func (g GradedAttempt) IsCorrect() bool { return g.Attempt.IsCorrect }

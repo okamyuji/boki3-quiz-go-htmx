@@ -294,7 +294,7 @@ func (h *Handler) postQuizAnswer(w http.ResponseWriter, r *http.Request) {
 	v := h.baseView(r, "採点結果")
 	v.ActiveSet = setCode
 	v.Mode = r.FormValue("mode")
-	v.Correct = g.IsCorrect
+	v.Correct = g.IsCorrect()
 	v.Explanation = g.Explanation
 	v.NextDueAt = g.NextDueAt
 	h.render(w, "answer", v)

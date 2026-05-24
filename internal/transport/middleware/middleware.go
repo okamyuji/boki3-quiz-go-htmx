@@ -104,12 +104,16 @@ func RequestID() func(http.Handler) http.Handler {
 
 // SecurityHeaders は HSTS / CSP nonce / X-Frame-Options / 等を設定する。
 //
-// 引数 sameOrigin が true の場合、CSP の script-src は 'self' + nonce のみ許容する。
-func SecurityHeaders() func(http.Handler) http.Handler {
+// logger が nil の場合は slog.Default を使う。
+func SecurityHeaders(logger *slog.Logger) func(http.Handler) http.Handler {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			nonceBytes := make([]byte, 16)
 			if _, err := rand.Read(nonceBytes); err != nil {
+				logger.Error("csp nonce rand", "err", err)
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 				return
 			}

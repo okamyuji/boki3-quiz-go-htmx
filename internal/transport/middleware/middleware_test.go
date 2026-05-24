@@ -48,7 +48,7 @@ func TestRequestIDSetsHeader(t *testing.T) {
 
 func TestSecurityHeaders(t *testing.T) {
 	t.Parallel()
-	h := middleware.SecurityHeaders()(noopHandler())
+	h := middleware.SecurityHeaders(nil)(noopHandler())
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/", nil)
 	h.ServeHTTP(w, r)

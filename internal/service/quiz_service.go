@@ -154,7 +154,6 @@ func (s *QuizService) Submit(ctx context.Context, userID int64, in domain.Submit
 	}
 	return &domain.GradedAttempt{
 		Attempt:     *att,
-		IsCorrect:   correct,
 		Explanation: q.Explanation,
 		NextDueAt:   next.DueAt,
 	}, nil
