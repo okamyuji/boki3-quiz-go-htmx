@@ -1,0 +1,3 @@
+Noto Serif JP / Noto Sans JP は OS フォントへフォールバックするためバイナリ未同梱。
+配布したい場合は Google Fonts もしくは npm @fontsource/noto-serif-jp から woff2 を取得し、
+このディレクトリに置いた上で app.css の font-family より先に @font-face を宣言する。
