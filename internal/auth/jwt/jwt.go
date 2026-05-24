@@ -71,7 +71,7 @@ func (s *HS256Signer) Sign(claims domain.JWTClaims) (string, error) {
 		return "", fmt.Errorf("jwt hmac: %w", err)
 	}
 	sig := mac.Sum(nil)
-	return signingInput + "." + base64URLBytes(sig), nil
+	return signingInput + "." + base64URL(sig), nil
 }
 
 // Parse は token を検証し claims を返す。
@@ -136,10 +136,6 @@ func (s *HS256Signer) Parse(token string) (domain.JWTClaims, error) {
 }
 
 func base64URL(b []byte) string {
-	return base64.RawURLEncoding.EncodeToString(b)
-}
-
-func base64URLBytes(b []byte) string {
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 
