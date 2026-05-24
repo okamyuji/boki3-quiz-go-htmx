@@ -15,6 +15,9 @@ import (
 )
 
 // SlidingWindow は鍵ごとに直近 Window の試行回数を Max に制限する。
+//
+// Allow 時に対象鍵のみ古い記録を剪定し、加えて空になった鍵はマップから削除する。
+// アクセスのない鍵は次回 Allow で評価された際に GC されるため goroutine 不要。
 type SlidingWindow struct {
 	mu     sync.Mutex
 	events map[string][]time.Time
@@ -53,6 +56,22 @@ func (s *SlidingWindow) Allow(key string) bool {
 	pruned = append(pruned, now)
 	s.events[key] = pruned
 	return true
+}
+
+// Sweep は last activity が window より古い鍵をマップから削除する。
+// 別 goroutine から定期的に呼ぶ想定 (Allow のホットパスを汚さない)。
+func (s *SlidingWindow) Sweep() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cutoff := s.clock.Now().Add(-s.window)
+	removed := 0
+	for k, evs := range s.events {
+		if len(evs) == 0 || !evs[len(evs)-1].After(cutoff) {
+			delete(s.events, k)
+			removed++
+		}
+	}
+	return removed
 }
 
 // FixedWindow は鍵ごとに WindowStart から Window 経過するまでカウントする。
@@ -104,6 +123,21 @@ func (f *FixedWindow) Reset(key string) {
 	delete(f.state, key)
 }
 
+// Sweep は windowStart が window より古い鍵を削除する。
+func (f *FixedWindow) Sweep() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	cutoff := f.clock.Now().Add(-f.window)
+	removed := 0
+	for k, st := range f.state {
+		if !st.windowStart.After(cutoff) {
+			delete(f.state, k)
+			removed++
+		}
+	}
+	return removed
+}
+
 // TokenBucket は鍵ごとに容量 capacity、毎秒 refillRate 補充されるトークンバケット。
 type TokenBucket struct {
 	mu         sync.Mutex
@@ -149,4 +183,19 @@ func (t *TokenBucket) Allow(key string) bool {
 	}
 	st.tokens--
 	return true
+}
+
+// Sweep は lastFill が ttl より古い (= long-idle) 鍵を削除する。
+func (t *TokenBucket) Sweep(ttl time.Duration) int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	cutoff := t.clock.Now().Add(-ttl)
+	removed := 0
+	for k, st := range t.buckets {
+		if !st.lastFill.After(cutoff) {
+			delete(t.buckets, k)
+			removed++
+		}
+	}
+	return removed
 }

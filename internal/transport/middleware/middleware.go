@@ -264,12 +264,17 @@ func CSRF(cookieName string) func(http.Handler) http.Handler {
 // JWTBearer は Authorization: Bearer <token> を検証し、userID を ctx に積む。
 // 認証失敗は 401 JSON を返す。
 func JWTBearer(api port.APIAuthService) func(http.Handler) http.Handler {
+	writeJSONErr := func(w http.ResponseWriter, status int, body string) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(body))
+	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			auth := r.Header.Get("Authorization")
 			const prefix = "Bearer "
 			if !strings.HasPrefix(auth, prefix) {
-				http.Error(w, `{"error":"unauthenticated"}`, http.StatusUnauthorized)
+				writeJSONErr(w, http.StatusUnauthorized, `{"error":"unauthenticated"}`)
 				return
 			}
 			tok := strings.TrimPrefix(auth, prefix)
@@ -277,9 +282,9 @@ func JWTBearer(api port.APIAuthService) func(http.Handler) http.Handler {
 			if err != nil {
 				switch {
 				case errors.Is(err, domain.ErrTokenExpired):
-					http.Error(w, `{"error":"token_expired"}`, http.StatusUnauthorized)
+					writeJSONErr(w, http.StatusUnauthorized, `{"error":"token_expired"}`)
 				default:
-					http.Error(w, `{"error":"unauthenticated"}`, http.StatusUnauthorized)
+					writeJSONErr(w, http.StatusUnauthorized, `{"error":"unauthenticated"}`)
 				}
 				return
 			}

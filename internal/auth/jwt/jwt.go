@@ -129,6 +129,9 @@ func (s *HS256Signer) Parse(token string) (domain.JWTClaims, error) {
 		ExpiresAt: time.Unix(p.Exp, 0).UTC(),
 		JTI:       p.JTI,
 	}
+	if !time.Now().UTC().Before(c.ExpiresAt) {
+		return domain.JWTClaims{}, errors.New("jwt: token expired")
+	}
 	return c, nil
 }
 

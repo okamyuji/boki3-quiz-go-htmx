@@ -17,6 +17,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/okamyuji/boki3-quiz-go-htmx/internal/domain"
 	"github.com/okamyuji/boki3-quiz-go-htmx/internal/pkg/sqlitex"
@@ -134,9 +135,26 @@ func upsertSets(ctx context.Context, db *sql.DB, sets []setSeed) error {
 	return nil
 }
 
+// dbExec はトランザクションでも素の DB でも使える ExecContext のミニ抽象。
+type dbExec interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
 func upsertQuestions(ctx context.Context, db *sql.DB, questions []seed.Question) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	now := time.Now().UTC().Unix()
 	for _, q := range questions {
-		topicID, err := lookupTopic(ctx, db, q.TopicCode)
+		topicID, err := lookupID(ctx, tx, `SELECT id FROM topics WHERE code = ?`, q.TopicCode)
 		if err != nil {
 			return fmt.Errorf("topic %s missing: %w", q.TopicCode, err)
 		}
@@ -152,9 +170,9 @@ func upsertQuestions(ctx context.Context, db *sql.DB, questions []seed.Question)
 		if err != nil {
 			return fmt.Errorf("marshal refs %s: %w", q.Code, err)
 		}
-		res, err := db.ExecContext(ctx,
+		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO questions(code, topic_id, question_type, difficulty, prompt, payload_json, answer_json, explanation, references_json, created_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			 ON CONFLICT(code) DO UPDATE SET
 			   topic_id=excluded.topic_id,
 			   question_type=excluded.question_type,
@@ -165,49 +183,35 @@ func upsertQuestions(ctx context.Context, db *sql.DB, questions []seed.Question)
 			   explanation=excluded.explanation,
 			   references_json=excluded.references_json`,
 			q.Code, topicID, q.QuestionType, q.Difficulty, q.Prompt,
-			string(payload), string(answer), q.Explanation, string(refs))
-		if err != nil {
+			string(payload), string(answer), q.Explanation, string(refs), now); err != nil {
 			return fmt.Errorf("upsert question %s: %w", q.Code, err)
 		}
-		_ = res
-		qID, err := lookupQuestion(ctx, db, q.Code)
+		qID, err := lookupID(ctx, tx, `SELECT id FROM questions WHERE code = ?`, q.Code)
 		if err != nil {
 			return err
 		}
 		for _, setCode := range q.Sets {
-			setID, err := lookupSet(ctx, db, setCode)
+			setID, err := lookupID(ctx, tx, `SELECT id FROM question_sets WHERE code = ?`, setCode)
 			if err != nil {
 				return fmt.Errorf("set %s missing: %w", setCode, err)
 			}
-			if _, err := db.ExecContext(ctx,
+			if _, err := tx.ExecContext(ctx,
 				`INSERT INTO question_set_members(set_id, question_id, ord) VALUES (?, ?, 0)
 				 ON CONFLICT(set_id, question_id) DO NOTHING`, setID, qID); err != nil {
 				return fmt.Errorf("upsert member %s/%s: %w", setCode, q.Code, err)
 			}
 		}
 	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+	committed = true
 	return nil
 }
 
-func lookupTopic(ctx context.Context, db *sql.DB, code string) (int64, error) {
+func lookupID(ctx context.Context, e dbExec, sqlText, code string) (int64, error) {
 	var id int64
-	if err := db.QueryRowContext(ctx, `SELECT id FROM topics WHERE code = ?`, code).Scan(&id); err != nil {
-		return 0, err
-	}
-	return id, nil
-}
-
-func lookupSet(ctx context.Context, db *sql.DB, code string) (int64, error) {
-	var id int64
-	if err := db.QueryRowContext(ctx, `SELECT id FROM question_sets WHERE code = ?`, code).Scan(&id); err != nil {
-		return 0, err
-	}
-	return id, nil
-}
-
-func lookupQuestion(ctx context.Context, db *sql.DB, code string) (int64, error) {
-	var id int64
-	if err := db.QueryRowContext(ctx, `SELECT id FROM questions WHERE code = ?`, code).Scan(&id); err != nil {
+	if err := e.QueryRowContext(ctx, sqlText, code).Scan(&id); err != nil {
 		return 0, err
 	}
 	return id, nil

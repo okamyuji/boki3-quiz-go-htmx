@@ -245,9 +245,14 @@ func (a *AuthService) validatePassword(p string) error {
 	return nil
 }
 
+// truncate は UTF-8 を壊さず先頭から max ルーンで切り詰めて返す。
 func truncate(s string, max int) string {
-	if len(s) <= max {
+	if max <= 0 {
+		return ""
+	}
+	r := []rune(s)
+	if len(r) <= max {
 		return s
 	}
-	return s[:max]
+	return string(r[:max])
 }

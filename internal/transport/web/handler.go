@@ -412,9 +412,14 @@ func (h *Handler) setCookie(w http.ResponseWriter, name, value string, httpOnly 
 	})
 }
 
+// randomToken は CSPRNG から byteLen バイトを取り hex 文字列で返す。
+// crypto/rand.Read が失敗するのは OS の CSPRNG が利用不能な極端な状況だけで、
+// このアプリは認証に必須のため、その状況では速やかに panic させ呼出側 (Recover middleware) が 500 を返す。
 func randomToken(byteLen int) string {
 	b := make([]byte, byteLen)
-	_, _ = cryptorand.Read(b)
+	if _, err := cryptorand.Read(b); err != nil {
+		panic("crypto/rand unavailable: " + err.Error())
+	}
 	return hex.EncodeToString(b)
 }
 

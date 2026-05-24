@@ -67,6 +67,11 @@ func (s *QuizService) NextQuestion(ctx context.Context, userID int64, setCode st
 	}
 }
 
+// pickSRS は学習モード SRS の選定ロジック。
+//
+// 既定重み: due 70% / 不正解履歴 20% / ランダム 10%。
+// due が空の場合は残り 30% を 20:10 比で再分配 (不正解 66.6% / ランダム 33.3%)。
+// 履歴フォールバックが空ならランダムに落ちる。
 func (s *QuizService) pickSRS(ctx context.Context, userID int64, all []domain.Question) (*domain.Question, error) {
 	now := s.clock.Now()
 	due, err := s.srs.DueForUser(ctx, userID, now, 50)
@@ -74,16 +79,14 @@ func (s *QuizService) pickSRS(ctx context.Context, userID int64, all []domain.Qu
 		return nil, fmt.Errorf("quiz srs due: %w", err)
 	}
 	r := s.rng()
-	roll := r.Float64()
-	if roll < 0.7 && len(due) > 0 {
+	if len(due) > 0 && r.Float64() < 0.7 {
 		q, err := s.questions.GetByID(ctx, due[r.IntN(len(due))].QuestionID)
 		if err == nil {
 			return q, nil
 		}
 	}
-	if roll < 0.9 {
-		// 不正解履歴を取得し、対応する srs.State の last_grade < 3 のものを優先
-		// 簡略化: 直近 history を見て間違った問題を 1 件返す
+	// 残り母数 (due が空なら 100%、そうでなければ 30%) を 2:1 で分割。
+	if r.Float64() < 2.0/3.0 {
 		attempts, err := s.attempts.ListByUser(ctx, userID, 50, 0)
 		if err == nil {
 			for _, a := range attempts {
@@ -96,7 +99,6 @@ func (s *QuizService) pickSRS(ctx context.Context, userID int64, all []domain.Qu
 			}
 		}
 	}
-	// fallback: random from set
 	return &all[r.IntN(len(all))], nil
 }
 

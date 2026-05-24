@@ -41,7 +41,7 @@ func run() error {
 	slog.SetDefault(logger)
 
 	addr := envOr("BOKI3_LISTEN", ":8080")
-	dbPath := envOr("BOKI3_DB", "boki3-quiz.db")
+	dbPath := envOr("BOKI3_DB_PATH", "boki3-quiz.db")
 	jwtSecret, err := loadJWTSecret(os.Getenv("BOKI3_JWT_SECRET"))
 	if err != nil {
 		return err

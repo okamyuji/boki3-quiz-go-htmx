@@ -22,6 +22,9 @@ func GradeFromResult(correct bool, durationMs int) Grade {
 	if !correct {
 		return GradeWorst
 	}
+	if durationMs < 0 {
+		durationMs = 0 // 時計の歪み等で負値が来ても 0 として扱う
+	}
 	switch {
 	case durationMs < 5000:
 		return GradePerfect
