@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"crypto/hmac"
 	cryptorand "crypto/rand"
 	"crypto/sha256"
@@ -21,7 +22,8 @@ import (
 
 // Handler は HTTP リクエストルーティングを担う。
 type Handler struct {
-	cfg Config
+	cfg         Config
+	topicNameOf map[int64]string // topic_id -> name (起動時にロード)
 }
 
 // Config はハンドラの構築引数。
@@ -32,6 +34,7 @@ type Config struct {
 	Stats           port.StatsService
 	Sets            port.SetRepository
 	Questions       port.QuestionRepository
+	Topics          port.TopicRepository
 	Logger          *slog.Logger
 	LoginRateLimit  port.RateLimiter
 	GlobalRateLimit port.RateLimiter
@@ -49,7 +52,22 @@ type CookieConfig struct {
 }
 
 // NewHandler は Handler を生成する。
-func NewHandler(cfg Config) *Handler { return &Handler{cfg: cfg} }
+//
+// cfg.Topics が指定されていれば起動時に topics を 1 度ロードし、id->name の解決に使う。
+// 失敗してもアプリは継続 (TopicName が空欄になるだけ)。
+func NewHandler(cfg Config) *Handler {
+	h := &Handler{cfg: cfg, topicNameOf: map[int64]string{}}
+	if cfg.Topics != nil {
+		if topics, err := cfg.Topics.ListAll(context.Background()); err == nil {
+			for _, t := range topics {
+				h.topicNameOf[t.ID] = t.Name
+			}
+		} else if cfg.Logger != nil {
+			cfg.Logger.Error("preload topics", "err", err)
+		}
+	}
+	return h
+}
 
 // signStartedAt は (questionID, ms) を HMAC-SHA256 して hex で返す。
 func (h *Handler) signStartedAt(questionID, ms int64) string {
@@ -251,8 +269,12 @@ func (h *Handler) getQuiz(w http.ResponseWriter, r *http.Request) {
 	question, err := h.cfg.Quiz.NextQuestion(r.Context(), user.ID, setCode, domain.QuizMode(mode))
 	if err == nil {
 		v.Question = question
+		v.TopicName = h.topicNameOf[question.TopicID]
 		v.StartedAtMs = time.Now().UnixMilli()
 		v.StartedAtSig = h.signStartedAt(question.ID, v.StartedAtMs)
+	}
+	if summary, err := h.cfg.Stats.Summary(r.Context(), user.ID); err == nil {
+		v.Summary = &summary
 	}
 	h.render(w, "quiz", v)
 }

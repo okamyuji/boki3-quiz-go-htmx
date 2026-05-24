@@ -43,6 +43,11 @@ type QuestionRepository interface {
 	Search(ctx context.Context, filter domain.QuestionFilter) ([]domain.Question, error)
 }
 
+// TopicRepository は topics テーブルへの読取操作を提供する。
+type TopicRepository interface {
+	ListAll(ctx context.Context) ([]domain.Topic, error)
+}
+
 // SetRepository は question_sets / question_set_members への操作を提供する。
 type SetRepository interface {
 	GetByCode(ctx context.Context, code string) (*domain.QuestionSet, error)

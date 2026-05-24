@@ -28,6 +28,7 @@ import (
 	"github.com/okamyuji/boki3-quiz-go-htmx/internal/transport/api"
 	"github.com/okamyuji/boki3-quiz-go-htmx/internal/transport/middleware"
 	"github.com/okamyuji/boki3-quiz-go-htmx/internal/transport/web"
+	"github.com/okamyuji/boki3-quiz-go-htmx/seed"
 )
 
 func main() {
@@ -58,12 +59,21 @@ func run() error {
 		return err
 	}
 
+	// 起動時 auto-seed (topics/sets/questions が全て空のときだけ実行する idempotent な処理)。
+	// BOKI3_SKIP_SEED=true を指定すれば抑止できる (運用 DB の安全側既定)。
+	if !envBool("BOKI3_SKIP_SEED", false) {
+		if err := seed.Bootstrap(context.Background(), db); err != nil {
+			return err
+		}
+	}
+
 	// Repositories
 	users := reposqlite.NewUserRepo(db)
 	sessions := reposqlite.NewSessionRepo(db)
 	jwts := reposqlite.NewJWTRevocationRepo(db)
 	questions := reposqlite.NewQuestionRepo(db)
 	sets := reposqlite.NewSetRepo(db)
+	topics := reposqlite.NewTopicRepo(db)
 	attempts := reposqlite.NewAttemptRepo(db)
 	srss := reposqlite.NewSRSStateRepo(db)
 
@@ -109,7 +119,7 @@ func run() error {
 	webH := web.NewHandler(web.Config{
 		Templates: tpl,
 		Auth:      authSvc, Quiz: quizSvc, Stats: statsSvc,
-		Sets: sets, Questions: questions, Logger: logger,
+		Sets: sets, Questions: questions, Topics: topics, Logger: logger,
 		LoginRateLimit: loginRL, GlobalRateLimit: globalRL,
 		Cookie:          cookieCfg,
 		StartedAtSecret: jwtSecret, // JWT 秘密と同じ秘密を流用 (どちらも環境変数管理)

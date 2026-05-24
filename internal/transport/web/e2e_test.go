@@ -58,6 +58,7 @@ func setupE2E(t *testing.T) *e2eFixture {
 	jwts := reposqlite.NewJWTRevocationRepo(db)
 	questions := reposqlite.NewQuestionRepo(db)
 	sets := reposqlite.NewSetRepo(db)
+	topics := reposqlite.NewTopicRepo(db)
 	attempts := reposqlite.NewAttemptRepo(db)
 	srss := reposqlite.NewSRSStateRepo(db)
 
@@ -80,7 +81,7 @@ func setupE2E(t *testing.T) *e2eFixture {
 	mux := http.NewServeMux()
 	webH := web.NewHandler(web.Config{
 		Templates: tpl, Auth: authSvc, Quiz: quizSvc, Stats: statsSvc,
-		Sets: sets, Questions: questions, Logger: logger,
+		Sets: sets, Questions: questions, Topics: topics, Logger: logger,
 		LoginRateLimit:  ratelimit.NewFixedWindow(100, time.Minute, clk),
 		GlobalRateLimit: ratelimit.NewSlidingWindow(1000, time.Minute, clk),
 		Cookie:          web.CookieConfig{SessionName: "boki3_session", CSRFName: "boki3_csrf"},

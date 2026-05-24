@@ -2,16 +2,16 @@
 <section class="quiz">
   <header class="quiz-head">
     <h2>学習</h2>
-    <form method="get" action="/quiz" class="inline-form">
+    <form method="get" action="/quiz" class="inline-form" x-data>
       <label>セット
-        <select name="set">
+        <select name="set" x-on:change="$el.form.submit()">
           {{range .Sets}}
           <option value="{{.Code}}" {{if eq .Code $.ActiveSet}}selected{{end}}>{{.Name}}</option>
           {{end}}
         </select>
       </label>
       <label>モード
-        <select name="mode">
+        <select name="mode" x-on:change="$el.form.submit()">
           <option value="srs"{{if eq .Mode "srs"}} selected{{end}}>復習優先 (SRS)</option>
           <option value="sequential"{{if eq .Mode "sequential"}} selected{{end}}>順序通り</option>
           <option value="random"{{if eq .Mode "random"}} selected{{end}}>ランダム</option>
@@ -55,6 +55,22 @@
   </article>
   {{else}}
   <p class="muted">このセットには問題がありません。</p>
+  {{end}}
+  {{if .Summary}}
+  <aside class="side">
+    <article class="card">
+      <h3>累計試行</h3>
+      <p class="num">{{.Summary.TotalAttempts}}</p>
+    </article>
+    <article class="card">
+      <h3>正解率</h3>
+      <p class="num">{{printf "%.1f" (mul .Summary.OverallRate 100.0)}}%</p>
+    </article>
+    <article class="card">
+      <h3>復習待ち</h3>
+      <p class="num">{{.Summary.DueCount}}</p>
+    </article>
+  </aside>
   {{end}}
 </section>
 {{end}}

@@ -110,9 +110,9 @@ a:focus-visible {
 
 .container {
   flex: 1;
-  width: min(1100px, 100%);
-  margin: 0 auto;
-  padding: var(--space-lg);
+  width: 100%;
+  margin: 0;
+  padding: var(--space-lg) clamp(1rem, 3vw, 2rem);
 }
 
 .hero { padding: var(--space-xl) 0; text-align: left; }
@@ -225,27 +225,99 @@ a:focus-visible {
   border-radius: var(--radius);
   background: var(--color-paper);
   font: inherit;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 .form input:focus, .form select:focus {
   outline: 2px solid var(--color-vermilion);
   outline-offset: -1px;
   border-color: var(--color-vermilion);
 }
+
+/* ブラウザ既定の select/option/button フォント上書き
+ * (Safari / Chrome の OS デフォルトフォントで浮かないように、全要素に和モダンフォントを継承させる) */
+input, select, textarea, button, option {
+  font-family: var(--font-sans);
+  font-size: inherit;
+  color: inherit;
+}
+.inline-form select, .inline-form input, .inline-form button {
+  padding: 0.45em 0.7em;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  background: var(--color-paper);
+}
+.inline-form label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  font-weight: 600;
+}
+.inline-form select {
+  min-width: 11rem;
+}
+.quiz .form { gap: var(--space-md); }
+.quiz .form > .btn { align-self: stretch; }
+.quiz .question { max-width: none; }
 .muted { color: var(--color-ink-soft); }
 .inline { display: inline; }
 .inline-form { display: flex; align-items: center; gap: var(--space-md); flex-wrap: wrap; }
 
+.quiz {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-lg);
+}
+@media (min-width: 1100px) {
+  .quiz {
+    grid-template-columns: minmax(0, 1fr) clamp(18rem, 26%, 26rem);
+  }
+  .quiz .quiz-head,
+  .quiz .question {
+    grid-column: 1;
+  }
+  .quiz .side {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
 .quiz .meta { color: var(--color-ink-soft); font-size: 0.9rem; }
 .quiz .prompt { font-family: var(--font-serif); font-size: var(--text-h2); margin: var(--space-sm) 0 var(--space-md); }
+.quiz .side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  align-self: start;
+  position: sticky;
+  top: var(--space-md);
+}
+.quiz .side .card { padding: var(--space-md); }
+.quiz .side h3 { font-size: 0.95rem; color: var(--color-ink-soft); margin: 0 0 var(--space-xs); font-family: var(--font-sans); font-weight: 600; letter-spacing: 0.04em; }
+.quiz .side .num { font-size: clamp(1.4rem, 1.1rem + 0.8vw, 2rem); margin: 0; font-family: var(--font-serif); }
 .entries {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   gap: var(--space-sm);
   border: 1px solid var(--color-line);
   border-radius: var(--radius);
   padding: var(--space-md);
 }
 .entries legend { padding: 0 0.4em; font-weight: 600; }
+.entries input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 0.55em 0.75em;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  background: var(--color-paper);
+  font: inherit;
+}
+@media (min-width: 900px) {
+  .entries { grid-template-columns: 2fr 1fr 2fr 1fr; }
+  .entries input { grid-column: span 1; }
+}
 
 .answer .result { font-family: var(--font-serif); font-size: var(--text-h1); }
 .answer .ok { color: oklch(48% 0.16 150); }

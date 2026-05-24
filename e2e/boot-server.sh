@@ -21,9 +21,10 @@ SECRET="${BOKI3_JWT_SECRET:-$(openssl rand -hex 32)}"
 
 cd "$ROOT"
 
-# E2E 用 DB を初期化 (毎回 fresh)
+# E2E 用 DB を初期化 (毎回 fresh)。
+# 旧 -seed フラグは embed FS 化で廃止済み (-force のみ意味あり)。
+# サーバ起動時の auto-seed (Bootstrap) があるので、ここでは事前投入不要。
 rm -f "$DB"
-go run ./cmd/seed-loader -db "$DB" -seed seed 1>&2
 
 # サーバ起動 (フォアグラウンド)
 # scrypt N=4096 にして E2E を高速化 (本番は 32768)。

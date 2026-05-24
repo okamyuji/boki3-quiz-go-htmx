@@ -79,19 +79,22 @@ func (s *QuizService) pickSRS(ctx context.Context, userID int64, all []domain.Qu
 	if err != nil {
 		return nil, fmt.Errorf("quiz srs due: %w", err)
 	}
+	var lastQID int64
+	if recent, _ := s.attempts.ListByUser(ctx, userID, 1, 0); len(recent) > 0 {
+		lastQID = recent[0].QuestionID
+	}
 	r := s.rng()
+
 	if len(due) > 0 && r.Float64() < 0.7 {
-		q, err := s.questions.GetByID(ctx, due[r.IntN(len(due))].QuestionID)
-		if err == nil {
+		if q := s.pickDueAvoid(ctx, due, lastQID, r); q != nil {
 			return q, nil
 		}
 	}
-	// 残り母数 (due が空なら 100%、そうでなければ 30%) を 2:1 で分割。
 	if r.Float64() < 2.0/3.0 {
 		attempts, err := s.attempts.ListByUser(ctx, userID, 50, 0)
 		if err == nil {
 			for _, a := range attempts {
-				if !a.IsCorrect {
+				if !a.IsCorrect && a.QuestionID != lastQID {
 					q, err := s.questions.GetByID(ctx, a.QuestionID)
 					if err == nil {
 						return q, nil
@@ -100,7 +103,35 @@ func (s *QuizService) pickSRS(ctx context.Context, userID int64, all []domain.Qu
 			}
 		}
 	}
-	return &all[r.IntN(len(all))], nil
+	return pickRandomAvoid(all, lastQID, r), nil
+}
+
+// pickDueAvoid は due から lastQID 以外を 1 件返す (見つからなければ nil)。
+func (s *QuizService) pickDueAvoid(ctx context.Context, due []srs.State, lastQID int64, r *rand.Rand) *domain.Question {
+	for range due {
+		st := due[r.IntN(len(due))]
+		if st.QuestionID == lastQID && len(due) > 1 {
+			continue
+		}
+		if q, err := s.questions.GetByID(ctx, st.QuestionID); err == nil {
+			return q
+		}
+	}
+	return nil
+}
+
+// pickRandomAvoid は all から lastQID 以外を 1 件返す (要素 1 個なら lastQID を返す)。
+func pickRandomAvoid(all []domain.Question, lastQID int64, r *rand.Rand) *domain.Question {
+	if len(all) == 1 {
+		return &all[0]
+	}
+	for range 10 {
+		idx := r.IntN(len(all))
+		if all[idx].ID != lastQID {
+			return &all[idx]
+		}
+	}
+	return &all[r.IntN(len(all))]
 }
 
 // Submit は採点して attempt と SRS 状態を保存する。
