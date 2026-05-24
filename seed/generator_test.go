@@ -35,8 +35,7 @@ func TestGenerateAnswersGradeAsCorrect(t *testing.T) {
 		if !grading.IsCorrect(q.Answer, q.Answer) {
 			t.Fatalf("question %s: self-grading not correct (likely answer/type mismatch)", q.Code)
 		}
-		switch q.Answer.Type {
-		case domain.QuestionTypeJournal:
+		if q.Answer.Type == domain.QuestionTypeJournal {
 			if len(q.Answer.Debits) == 0 || len(q.Answer.Credits) == 0 {
 				t.Fatalf("question %s: journal must have both sides", q.Code)
 			}

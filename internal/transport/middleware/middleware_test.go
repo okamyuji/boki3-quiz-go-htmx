@@ -25,7 +25,7 @@ func TestRecoverCatchesPanic(t *testing.T) {
 		panic("boom")
 	}))
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/x", nil)
+	r := httptest.NewRequest("GET", "/x", http.NoBody)
 	h.ServeHTTP(w, r)
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("code = %d", w.Code)
@@ -39,7 +39,7 @@ func TestRequestIDSetsHeader(t *testing.T) {
 		seen = middleware.RequestIDFrom(r.Context())
 	}))
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/", nil)
+	r := httptest.NewRequest("GET", "/", http.NoBody)
 	h.ServeHTTP(w, r)
 	if seen == "" || w.Header().Get("X-Request-ID") == "" {
 		t.Fatalf("X-Request-ID not set")
@@ -50,7 +50,7 @@ func TestSecurityHeaders(t *testing.T) {
 	t.Parallel()
 	h := middleware.SecurityHeaders(nil)(noopHandler())
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/", nil)
+	r := httptest.NewRequest("GET", "/", http.NoBody)
 	h.ServeHTTP(w, r)
 	must := []string{"Content-Security-Policy", "X-Frame-Options", "Strict-Transport-Security", "Referrer-Policy"}
 	for _, k := range must {
@@ -91,7 +91,7 @@ func TestCORSAllowsConfiguredOrigin(t *testing.T) {
 		AllowCreds:     true,
 		MaxAge:         600,
 	})(noopHandler())
-	r := httptest.NewRequest("GET", "/", nil)
+	r := httptest.NewRequest("GET", "/", http.NoBody)
 	r.Header.Set("Origin", "https://app.example.com")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -106,7 +106,7 @@ func TestCORSAllowsConfiguredOrigin(t *testing.T) {
 func TestCORSPreflight(t *testing.T) {
 	t.Parallel()
 	h := middleware.CORS(middleware.CORSConfig{AllowedOrigins: []string{"https://x.example"}})(noopHandler())
-	r := httptest.NewRequest("OPTIONS", "/", nil)
+	r := httptest.NewRequest("OPTIONS", "/", http.NoBody)
 	r.Header.Set("Origin", "https://x.example")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -123,7 +123,7 @@ func TestRateLimitByIPBlocks(t *testing.T) {
 	t.Parallel()
 	h := middleware.RateLimitByIP(fakeRL{allow: false})(noopHandler())
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/", nil)
+	r := httptest.NewRequest("GET", "/", http.NoBody)
 	r.RemoteAddr = "1.2.3.4:1234"
 	h.ServeHTTP(w, r)
 	if w.Code != http.StatusTooManyRequests {
@@ -145,7 +145,7 @@ func TestChainOrder(t *testing.T) {
 	}
 	final := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) { order += "final " })
 	h := middleware.Chain(final, mid("a"), mid("b"))
-	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/", nil))
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/", http.NoBody))
 	want := "a:pre b:pre final b:post a:post "
 	if order != want {
 		t.Fatalf("order = %q, want %q", order, want)

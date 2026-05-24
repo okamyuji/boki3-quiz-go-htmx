@@ -19,6 +19,11 @@ import (
 	"github.com/okamyuji/boki3-quiz-go-htmx/internal/transport/svg"
 )
 
+// Handler は HTTP リクエストルーティングを担う。
+type Handler struct {
+	cfg Config
+}
+
 // Config はハンドラの構築引数。
 type Config struct {
 	Templates       *Templates
@@ -34,6 +39,17 @@ type Config struct {
 	// StartedAtSecret は started_at の HMAC 署名に使う鍵。32 バイト以上推奨。
 	StartedAtSecret []byte
 }
+
+// CookieConfig は cookie 名と属性。
+type CookieConfig struct {
+	SessionName string
+	CSRFName    string
+	Secure      bool
+	Domain      string
+}
+
+// NewHandler は Handler を生成する。
+func NewHandler(cfg Config) *Handler { return &Handler{cfg: cfg} }
 
 // signStartedAt は (questionID, ms) を HMAC-SHA256 して hex で返す。
 func (h *Handler) signStartedAt(questionID, ms int64) string {
@@ -57,22 +73,6 @@ func (h *Handler) verifyStartedAt(questionID, ms int64, sig string, now time.Tim
 	}
 	return true
 }
-
-// CookieConfig は cookie 名と属性。
-type CookieConfig struct {
-	SessionName string
-	CSRFName    string
-	Secure      bool
-	Domain      string
-}
-
-// Handler は HTTP リクエストルーティングを担う。
-type Handler struct {
-	cfg Config
-}
-
-// NewHandler は Handler を生成する。
-func NewHandler(cfg Config) *Handler { return &Handler{cfg: cfg} }
 
 // Register はルートを mux へ登録する。
 func (h *Handler) Register(mux *http.ServeMux) {
@@ -309,9 +309,9 @@ func buildAnswerFromForm(r *http.Request, qt domain.QuestionType) domain.AnswerP
 	return domain.AnswerPayload{Type: qt, Choice: strings.TrimSpace(r.FormValue("choice"))}
 }
 
-func readEntries(r *http.Request, accountPrefix, amountPrefix string, max int) []domain.JournalEntry {
-	out := make([]domain.JournalEntry, 0, max)
-	for i := 1; i <= max; i++ {
+func readEntries(r *http.Request, accountPrefix, amountPrefix string, maxRows int) []domain.JournalEntry {
+	out := make([]domain.JournalEntry, 0, maxRows)
+	for i := 1; i <= maxRows; i++ {
 		idx := strconv.Itoa(i)
 		acc := strings.TrimSpace(r.FormValue(accountPrefix + idx))
 		amt, _ := strconv.ParseInt(r.FormValue(amountPrefix+idx), 10, 64)
@@ -431,12 +431,19 @@ func (h *Handler) setSessionCookies(w http.ResponseWriter, s *domain.Session) {
 }
 
 func (h *Handler) clearSessionCookies(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{Name: h.cfg.Cookie.SessionName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: h.cfg.Cookie.Secure, SameSite: http.SameSiteLaxMode})
-	http.SetCookie(w, &http.Cookie{Name: h.cfg.Cookie.CSRFName, Value: "", Path: "/", MaxAge: -1, Secure: h.cfg.Cookie.Secure, SameSite: http.SameSiteLaxMode})
+	// Secure は BOKI3_COOKIE_SECURE で本番 ON / dev OFF を切り替える。gosec G124 は静的検査で動的判定不可のため抑止。
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // Secure は実行時に Cookie.Secure で制御
+		Name: h.cfg.Cookie.SessionName, Value: "", Path: "/", MaxAge: -1,
+		HttpOnly: true, Secure: h.cfg.Cookie.Secure, SameSite: http.SameSiteLaxMode,
+	})
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // CSRF cookie は JS から読む必要があり HttpOnly false 固定
+		Name: h.cfg.Cookie.CSRFName, Value: "", Path: "/", MaxAge: -1,
+		Secure: h.cfg.Cookie.Secure, SameSite: http.SameSiteLaxMode,
+	})
 }
 
 func (h *Handler) setCookie(w http.ResponseWriter, name, value string, httpOnly bool) {
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // Secure は実行時に Cookie.Secure で制御、HttpOnly は呼出側で制御
 		Name:     name,
 		Value:    value,
 		Path:     "/",

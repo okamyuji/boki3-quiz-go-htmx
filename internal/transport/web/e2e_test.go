@@ -5,6 +5,7 @@
 package web_test
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -184,7 +185,7 @@ func TestE2ERegisterLoginQuizFlow(t *testing.T) {
 	// 1) GET /register
 	resp := mustGet(t, fx, "/register")
 	csrf := extractCSRF(t, resp)
-	_ = mustClose(resp)
+	_ = resp.Body.Close()
 
 	// 2) POST /register
 	body := url.Values{
@@ -196,7 +197,7 @@ func TestE2ERegisterLoginQuizFlow(t *testing.T) {
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusSeeOther {
 		t.Fatalf("/register status = %d", resp.StatusCode)
 	}
-	_ = mustClose(resp)
+	_ = resp.Body.Close()
 
 	// 3) GET /quiz (認証必須なのでアクセス可能になっているはず)
 	resp = mustGet(t, fx, "/quiz")
@@ -204,7 +205,7 @@ func TestE2ERegisterLoginQuizFlow(t *testing.T) {
 		t.Fatalf("/quiz status = %d, want 200", resp.StatusCode)
 	}
 	bodyBytes, _ := io.ReadAll(resp.Body)
-	_ = mustClose(resp)
+	_ = resp.Body.Close()
 	if !strings.Contains(string(bodyBytes), "現金で 1000 円を売上げた") {
 		t.Fatalf("/quiz body does not contain prompt; body=%s", string(bodyBytes)[:min(400, len(bodyBytes))])
 	}
@@ -218,7 +219,7 @@ func TestE2EHomePageRenders(t *testing.T) {
 		t.Fatalf("/ = %d", resp.StatusCode)
 	}
 	b, _ := io.ReadAll(resp.Body)
-	_ = mustClose(resp)
+	_ = resp.Body.Close()
 	if !strings.Contains(string(b), "簿記3級") {
 		t.Fatalf("home page does not contain expected title")
 	}
@@ -259,13 +260,13 @@ func TestE2EAPILoginAndNext(t *testing.T) {
 	// ユーザ登録は HTML 経路でしか提供していないため、まず Web 経由で登録する。
 	resp := mustGet(t, fx, "/register")
 	csrf := extractCSRF(t, resp)
-	_ = mustClose(resp)
+	_ = resp.Body.Close()
 	resp = mustPostForm(t, fx, "/register", url.Values{
 		"csrf_token": {csrf},
 		"username":   {"apiuser01"},
 		"password":   {"P@ssw0rd!Strong"},
 	})
-	_ = mustClose(resp)
+	_ = resp.Body.Close()
 
 	// JWT 取得
 	body := strings.NewReader(`{"username":"apiuser01","password":"P@ssw0rd!Strong"}`)
@@ -291,7 +292,7 @@ func TestE2EAPILoginAndNext(t *testing.T) {
 	}
 
 	// /api/v1/quiz/next
-	req2, _ := http.NewRequest(http.MethodGet, fx.srv.URL+"/api/v1/quiz/next?set=core_300", nil)
+	req2, _ := http.NewRequest(http.MethodGet, fx.srv.URL+"/api/v1/quiz/next?set=core_300", http.NoBody)
 	req2.Header.Set("Authorization", "Bearer "+lr.Token)
 	r2, err := fx.client.Do(req2)
 	if err != nil {
@@ -323,8 +324,6 @@ func mustPostForm(t *testing.T, fx *e2eFixture, path string, values url.Values) 
 	return r
 }
 
-func mustClose(r *http.Response) error { return r.Body.Close() }
-
 // extractCSRF は HTML から最初の csrf_token hidden input を取り出す簡易抽出。
 func extractCSRF(t *testing.T, r *http.Response) string {
 	t.Helper()
@@ -332,16 +331,15 @@ func extractCSRF(t *testing.T, r *http.Response) string {
 	if err != nil {
 		t.Fatalf("read body: %v", err)
 	}
-	// 簡易: name="csrf_token" value="..." を探す
-	const needle = `name="csrf_token" value="`
-	idx := strings.Index(string(b), needle)
+	needle := []byte(`name="csrf_token" value="`)
+	idx := bytes.Index(b, needle)
 	if idx < 0 {
 		t.Fatalf("csrf hidden input not found")
 	}
-	rest := string(b)[idx+len(needle):]
-	end := strings.IndexByte(rest, '"')
+	rest := b[idx+len(needle):]
+	end := bytes.IndexByte(rest, '"')
 	if end < 0 {
 		t.Fatalf("csrf value not terminated")
 	}
-	return rest[:end]
+	return string(rest[:end])
 }

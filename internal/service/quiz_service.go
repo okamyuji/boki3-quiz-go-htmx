@@ -35,7 +35,8 @@ func NewQuizService(
 	}
 	return &QuizService{
 		questions: q, sets: s, attempts: a, srs: st, clock: clk,
-		rng: func() *rand.Rand { return rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64())) },
+		// 学習問題の選定にしか使わないため、暗号用途ではない math/rand/v2 で十分。
+		rng: func() *rand.Rand { return rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64())) }, //nolint:gosec // SRS 抽選用、暗号目的ではない
 	}
 }
 

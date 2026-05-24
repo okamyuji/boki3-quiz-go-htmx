@@ -182,13 +182,12 @@ func (r *AttemptRepo) DailyAccuracy(ctx context.Context, userID int64, days int,
 }
 
 // SummaryForUser は全試行数と正解数を返す。
-func (r *AttemptRepo) SummaryForUser(ctx context.Context, userID int64) (int, int, error) {
-	var total, correct int
-	err := r.db.QueryRowContext(ctx,
+func (r *AttemptRepo) SummaryForUser(ctx context.Context, userID int64) (totalAttempts, totalCorrect int, err error) {
+	err = r.db.QueryRowContext(ctx,
 		`SELECT COUNT(*), COALESCE(SUM(is_correct), 0) FROM attempts WHERE user_id = ?`, userID,
-	).Scan(&total, &correct)
+	).Scan(&totalAttempts, &totalCorrect)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return 0, 0, fmt.Errorf("attempt summary: %w", err)
 	}
-	return total, correct, nil
+	return totalAttempts, totalCorrect, nil
 }

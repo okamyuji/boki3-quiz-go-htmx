@@ -211,7 +211,12 @@ func validateUsername(u string) error {
 		return domain.ErrUsernameInvalid
 	}
 	for _, r := range u {
-		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-') {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+		case r == '_' || r == '-':
+		default:
 			return domain.ErrUsernameInvalid
 		}
 	}
@@ -258,13 +263,14 @@ var (
 	dummyTimingParams = "scrypt$N=32768$r=8$p=1$keyLen=32"
 )
 
-func truncate(s string, max int) string {
-	if max <= 0 {
+// truncate は UTF-8 を壊さず先頭から maxRunes ルーンで切り詰めて返す。
+func truncate(s string, maxRunes int) string {
+	if maxRunes <= 0 {
 		return ""
 	}
 	r := []rune(s)
-	if len(r) <= max {
+	if len(r) <= maxRunes {
 		return s
 	}
-	return string(r[:max])
+	return string(r[:maxRunes])
 }

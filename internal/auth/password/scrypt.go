@@ -45,19 +45,19 @@ func Default() *ScryptHasher { return New(DefaultParams()) }
 var _ port.PasswordHasher = (*ScryptHasher)(nil)
 
 // Hash は plain から salt と key を生成し、ハッシュ・salt・params 文字列を返す。
-func (h *ScryptHasher) Hash(plain string) ([]byte, []byte, string, error) {
+func (h *ScryptHasher) Hash(plain string) (hash, salt []byte, params string, err error) {
 	if plain == "" {
 		return nil, nil, "", errors.New("password is empty")
 	}
-	salt := make([]byte, h.params.SaltLen)
-	if _, err := rand.Read(salt); err != nil {
+	salt = make([]byte, h.params.SaltLen)
+	if _, err = rand.Read(salt); err != nil {
 		return nil, nil, "", fmt.Errorf("scrypt salt: %w", err)
 	}
-	key, err := scrypt.Key([]byte(plain), salt, h.params.N, h.params.R, h.params.P, h.params.KeyLen)
+	hash, err = scrypt.Key([]byte(plain), salt, h.params.N, h.params.R, h.params.P, h.params.KeyLen)
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("scrypt key: %w", err)
 	}
-	return key, salt, encodeParams(h.params), nil
+	return hash, salt, encodeParams(h.params), nil
 }
 
 // Verify は params をパースし plain を hash と比較する (一定時間比較)。

@@ -86,7 +86,7 @@ type setSeed struct {
 }
 
 func loadTopics(path string) ([]topicSeed, error) {
-	b, err := os.ReadFile(path)
+	b, err := readSeedFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read topics: %w", err)
 	}
@@ -98,7 +98,7 @@ func loadTopics(path string) ([]topicSeed, error) {
 }
 
 func loadSets(path string) ([]setSeed, error) {
-	b, err := os.ReadFile(path)
+	b, err := readSeedFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read sets: %w", err)
 	}
@@ -107,6 +107,17 @@ func loadSets(path string) ([]setSeed, error) {
 		return nil, fmt.Errorf("parse sets: %w", err)
 	}
 	return out, nil
+}
+
+// readSeedFile は seed/ 配下のファイルだけを許可する読み取り (gosec G304 緩和)。
+func readSeedFile(path string) ([]byte, error) {
+	clean := filepath.Clean(path)
+	base := filepath.Base(clean)
+	allowed := map[string]bool{"topics.json": true, "sets.json": true}
+	if !allowed[base] {
+		return nil, fmt.Errorf("disallowed seed file: %s", base)
+	}
+	return os.ReadFile(clean) //nolint:gosec // ファイル名は allowlist 経由のみ
 }
 
 func upsertTopics(ctx context.Context, db *sql.DB, topics []topicSeed) error {
@@ -153,7 +164,8 @@ func upsertQuestions(ctx context.Context, db *sql.DB, questions []seed.Question)
 		}
 	}()
 	now := time.Now().UTC().Unix()
-	for _, q := range questions {
+	for i := range questions {
+		q := &questions[i]
 		topicID, err := lookupID(ctx, tx, `SELECT id FROM topics WHERE code = ?`, q.TopicCode)
 		if err != nil {
 			return fmt.Errorf("topic %s missing: %w", q.TopicCode, err)

@@ -33,10 +33,10 @@ func NewAPIAuthService(signer port.JWTSigner, jwts port.JWTRevocationRepository,
 var _ port.APIAuthService = (*APIAuthService)(nil)
 
 // IssueToken は userID 向けの JWT を発行する。
-func (a *APIAuthService) IssueToken(_ context.Context, userID int64, ttl time.Duration) (string, string, time.Time, error) {
+func (a *APIAuthService) IssueToken(_ context.Context, userID int64, ttl time.Duration) (token, jti string, expiresAt time.Time, err error) {
 	now := a.clock.Now()
-	exp := now.Add(ttl)
-	jti, err := a.idgen.NewUUID()
+	expiresAt = now.Add(ttl)
+	jti, err = a.idgen.NewUUID()
 	if err != nil {
 		return "", "", time.Time{}, fmt.Errorf("api auth jti: %w", err)
 	}
@@ -45,14 +45,14 @@ func (a *APIAuthService) IssueToken(_ context.Context, userID int64, ttl time.Du
 		Issuer:    a.issuer,
 		Audience:  a.aud,
 		IssuedAt:  now,
-		ExpiresAt: exp,
+		ExpiresAt: expiresAt,
 		JTI:       jti,
 	}
-	tok, err := a.signer.Sign(c)
+	token, err = a.signer.Sign(c)
 	if err != nil {
 		return "", "", time.Time{}, fmt.Errorf("api auth sign: %w", err)
 	}
-	return tok, jti, exp, nil
+	return token, jti, expiresAt, nil
 }
 
 // VerifyToken はトークンを検証し subject (userID) を返す。

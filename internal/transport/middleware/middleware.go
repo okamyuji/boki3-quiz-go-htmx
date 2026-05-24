@@ -211,7 +211,7 @@ func RateLimitByIP(rl port.RateLimiter) func(http.Handler) http.Handler {
 
 // Session は session_id Cookie からセッションをロードし ctx に積む。
 // 認証必須ハンドラの前段で使う。失敗時は redirect (HTML) または 401 (JSON) を返す。
-func Session(auth port.AuthService, cookieName string, htmlLoginPath string) func(http.Handler) http.Handler {
+func Session(auth port.AuthService, cookieName, htmlLoginPath string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			c, err := r.Cookie(cookieName)
