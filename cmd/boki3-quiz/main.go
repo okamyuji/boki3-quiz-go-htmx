@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -66,8 +67,8 @@ func run() error {
 	attempts := reposqlite.NewAttemptRepo(db)
 	srss := reposqlite.NewSRSStateRepo(db)
 
-	// Auth pieces
-	hasher := password.Default()
+	// Auth pieces. BOKI3_SCRYPT_N で N を上書き可 (E2E などで cost を下げる用途)。
+	hasher := newHasher(os.Getenv("BOKI3_SCRYPT_N"))
 	idg := idgen.New()
 	signer, err := jwtauth.NewHS256(jwtSecret)
 	if err != nil {
@@ -81,10 +82,13 @@ func run() error {
 	quizSvc := service.NewQuizService(questions, sets, attempts, srss, clk)
 	statsSvc := service.NewStatsService(attempts, srss, clk)
 
-	// Rate limiters
-	globalRL := ratelimit.NewSlidingWindow(120, time.Minute, clk)
-	loginRL := ratelimit.NewFixedWindow(5, 10*time.Minute, clk)
-	userAPIRL := ratelimit.NewTokenBucket(60, 1, clk)
+	// Rate limiters。E2E などで上書きするため env で数値を調整可能。
+	globalMax := envInt("BOKI3_RL_GLOBAL_MAX", 120)
+	loginMax := envInt("BOKI3_RL_LOGIN_MAX", 5)
+	apiBurst := envInt("BOKI3_RL_API_BURST", 60)
+	globalRL := ratelimit.NewSlidingWindow(globalMax, time.Minute, clk)
+	loginRL := ratelimit.NewFixedWindow(loginMax, 10*time.Minute, clk)
+	userAPIRL := ratelimit.NewTokenBucket(float64(apiBurst), 1, clk)
 
 	// Templates
 	tpl, err := web.LoadTemplates()
@@ -219,6 +223,15 @@ func envOr(key, def string) string {
 	return def
 }
 
+func envInt(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return def
+}
+
 func envBool(key string, def bool) bool {
 	v := strings.ToLower(os.Getenv(key))
 	switch v {
@@ -244,6 +257,18 @@ func splitEnv(key string) []string {
 		}
 	}
 	return out
+}
+
+// newHasher は password.Default() を返すが、nStr が指定されていれば N をそれに置き換える。
+// E2E などで scrypt の cost を下げる用途に使う。最小 1024。
+func newHasher(nStr string) *password.ScryptHasher {
+	p := password.DefaultParams()
+	if nStr != "" {
+		if n, err := strconv.Atoi(nStr); err == nil && n >= 1024 {
+			p.N = n
+		}
+	}
+	return password.New(p)
 }
 
 // loadJWTSecret は BOKI3_JWT_SECRET (hex 64+ 文字) を読む。

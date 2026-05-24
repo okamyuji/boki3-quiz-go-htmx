@@ -109,9 +109,11 @@ func DailyAccuracyChart(data []domain.DailyAccuracy, width, height int) string {
 		labels = append(labels, n/2)
 	}
 	for _, i := range labels {
-		x := padL + plotW*i/(n-1)
-		if n == 1 {
+		var x int
+		if n <= 1 {
 			x = padL + plotW/2
+		} else {
+			x = padL + plotW*i/(n-1)
 		}
 		sb.WriteString(`<text x="`)
 		sb.WriteString(strconv.Itoa(x))

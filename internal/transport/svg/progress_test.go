@@ -20,6 +20,21 @@ func TestDailyAccuracyChartEmpty(t *testing.T) {
 	}
 }
 
+func TestDailyAccuracyChartWithSingleDataPoint(t *testing.T) {
+	t.Parallel()
+	data := []domain.DailyAccuracy{
+		{Date: time.Date(2026, 5, 22, 0, 0, 0, 0, time.UTC), Total: 1, Correct: 1},
+	}
+	// 1 件のときは divide-by-zero しないこと
+	got := svg.DailyAccuracyChart(data, 600, 200)
+	if !strings.Contains(got, "<polyline") {
+		t.Fatalf("missing polyline")
+	}
+	if !strings.Contains(got, "05/22") {
+		t.Fatalf("date label missing for single-day data")
+	}
+}
+
 func TestDailyAccuracyChartWithData(t *testing.T) {
 	t.Parallel()
 	data := []domain.DailyAccuracy{

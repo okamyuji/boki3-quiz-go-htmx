@@ -22,3 +22,9 @@ data/
 # Build artifacts
 coverage.txt
 coverage.html
+
+# Playwright / Node
+e2e/playwright/node_modules/
+e2e/playwright/test-results/
+e2e/playwright/playwright-report/
+e2e/playwright/playwright/.cache/
