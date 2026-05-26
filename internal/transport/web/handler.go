@@ -467,10 +467,7 @@ func (h *Handler) clearSessionCookies(w http.ResponseWriter) {
 func (h *Handler) setCookie(w http.ResponseWriter, name, value string, httpOnly bool) {
 	// セッション Cookie は常に HttpOnly=true を強制する。
 	// (CSRF Cookie は JS から読む要件があるため呼出側指定を維持)
-	effectiveHTTPOnly := httpOnly
-	if name == h.cfg.Cookie.SessionName {
-		effectiveHTTPOnly = true
-	}
+	effectiveHTTPOnly := httpOnly || name == h.cfg.Cookie.SessionName
 
 	http.SetCookie(w, &http.Cookie{ //nolint:gosec // Secure は実行時に Cookie.Secure で制御、Session は HttpOnly 強制
 		Name:     name,
