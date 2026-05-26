@@ -465,11 +465,18 @@ func (h *Handler) clearSessionCookies(w http.ResponseWriter) {
 }
 
 func (h *Handler) setCookie(w http.ResponseWriter, name, value string, httpOnly bool) {
-	http.SetCookie(w, &http.Cookie{ //nolint:gosec // Secure は実行時に Cookie.Secure で制御、HttpOnly は呼出側で制御
+	// セッション Cookie は常に HttpOnly=true を強制する。
+	// (CSRF Cookie は JS から読む要件があるため呼出側指定を維持)
+	effectiveHTTPOnly := httpOnly
+	if name == h.cfg.Cookie.SessionName {
+		effectiveHTTPOnly = true
+	}
+
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // Secure は実行時に Cookie.Secure で制御、Session は HttpOnly 強制
 		Name:     name,
 		Value:    value,
 		Path:     "/",
-		HttpOnly: httpOnly,
+		HttpOnly: effectiveHTTPOnly,
 		Secure:   h.cfg.Cookie.Secure,
 		SameSite: http.SameSiteLaxMode,
 		Domain:   h.cfg.Cookie.Domain,
