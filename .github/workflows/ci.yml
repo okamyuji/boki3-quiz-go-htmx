@@ -13,6 +13,12 @@ on:
 permissions:
   contents: read
 
+# すべての JavaScript アクション (checkout / setup-* / upload-artifact 等) を
+# Node.js 24 ランタイムで実行する。Node 20 は 2026-09-16 にランナーから削除され、
+# 2026-06-02 以降はデフォルトが Node 24 になるため、先行して opt-in しておく。
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   pre-commit:
     name: pre-commit (quality-gate + gitleaks)

@@ -9,12 +9,18 @@ import (
 
 	"github.com/okamyuji/boki3-quiz-go-htmx/internal/auth/jwt"
 	"github.com/okamyuji/boki3-quiz-go-htmx/internal/domain"
+	"github.com/okamyuji/boki3-quiz-go-htmx/internal/pkg/clock"
 )
+
+// testNow は全テストで共有する固定の「現在時刻」。
+// signer に clock.Fixed{T: testNow} を注入することで、exp 判定が実行日時に
+// 依存しなくなり、時限爆弾化も flaky 化もしない決定的なテストになる。
+var testNow = time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
 
 func newSigner(t *testing.T) *jwt.HS256Signer {
 	t.Helper()
 	secret := bytes.Repeat([]byte{0xab}, 32)
-	s, err := jwt.NewHS256(secret)
+	s, err := jwt.NewHS256(secret, clock.Fixed{T: testNow})
 	if err != nil {
 		t.Fatalf("NewHS256: %v", err)
 	}
@@ -24,8 +30,9 @@ func newSigner(t *testing.T) *jwt.HS256Signer {
 func TestSignAndParse(t *testing.T) {
 	t.Parallel()
 	s := newSigner(t)
-	// 相対時刻を使う。固定日付だと exp がいずれ過去になり時限爆弾的に失敗する。
-	now := time.Now().UTC()
+	// 固定クロック (testNow) を基準に exp を未来へ置く。signer も testNow を
+	// 現在時刻とみなすため、実行日時に関わらず「期限内」と判定される。
+	now := testNow
 	claims := domain.JWTClaims{
 		Subject: 42, Issuer: "boki3-quiz", Audience: "api",
 		IssuedAt: now, ExpiresAt: now.Add(time.Hour), JTI: "abc",
@@ -73,7 +80,7 @@ func TestParseRejectsRS256(t *testing.T) {
 func TestParseRejectsBadSignature(t *testing.T) {
 	t.Parallel()
 	s := newSigner(t)
-	claims := domain.JWTClaims{Subject: 1, IssuedAt: time.Now(), ExpiresAt: time.Now().Add(time.Hour), JTI: "j"}
+	claims := domain.JWTClaims{Subject: 1, IssuedAt: testNow, ExpiresAt: testNow.Add(time.Hour), JTI: "j"}
 	tok, _ := s.Sign(claims)
 	tampered := tok[:len(tok)-2] + "xx"
 	if _, err := s.Parse(tampered); err == nil {
@@ -81,9 +88,27 @@ func TestParseRejectsBadSignature(t *testing.T) {
 	}
 }
 
+func TestParseRejectsExpired(t *testing.T) {
+	t.Parallel()
+	s := newSigner(t)
+	// exp を固定クロック (testNow) より過去に置くと、署名は正しくても拒否される。
+	// クロック注入により、この期限切れ判定を決定的に検証できる。
+	claims := domain.JWTClaims{
+		Subject: 7, Issuer: "boki3-quiz", Audience: "api",
+		IssuedAt: testNow.Add(-2 * time.Hour), ExpiresAt: testNow.Add(-time.Hour), JTI: "exp",
+	}
+	tok, err := s.Sign(claims)
+	if err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+	if _, err := s.Parse(tok); err == nil {
+		t.Fatalf("expected expired token to be rejected")
+	}
+}
+
 func TestParseShortSecretRejected(t *testing.T) {
 	t.Parallel()
-	if _, err := jwt.NewHS256([]byte("short")); err == nil {
+	if _, err := jwt.NewHS256([]byte("short"), clock.Fixed{T: testNow}); err == nil {
 		t.Fatalf("expected short secret to be rejected")
 	}
 }
