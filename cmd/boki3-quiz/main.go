@@ -80,11 +80,11 @@ func run() error {
 	// Auth pieces. BOKI3_SCRYPT_N で N を上書き可 (E2E などで cost を下げる用途)。
 	hasher := newHasher(os.Getenv("BOKI3_SCRYPT_N"))
 	idg := idgen.New()
-	signer, err := jwtauth.NewHS256(jwtSecret)
+	clk := clock.System{}
+	signer, err := jwtauth.NewHS256(jwtSecret, clk)
 	if err != nil {
 		return err
 	}
-	clk := clock.System{}
 
 	// Services
 	authSvc := service.NewAuthService(users, sessions, jwts, hasher, idg, clk, service.DefaultAuthConfig())
