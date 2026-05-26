@@ -67,7 +67,7 @@ func setupE2E(t *testing.T) *e2eFixture {
 	clk := clock.System{}
 
 	authSvc := service.NewAuthService(users, sessions, jwts, hasher, g, clk, service.DefaultAuthConfig())
-	signer, _ := jwtauth.NewHS256([]byte("test-secret-32bytes-test-secret-32bytes"))
+	signer, _ := jwtauth.NewHS256([]byte("test-secret-32bytes-test-secret-32bytes"), clk)
 	apiAuth := service.NewAPIAuthService(signer, jwts, g, clk, "boki3-quiz", "api")
 	quizSvc := service.NewQuizService(questions, sets, attempts, srss, clk)
 	statsSvc := service.NewStatsService(attempts, srss, clk)
