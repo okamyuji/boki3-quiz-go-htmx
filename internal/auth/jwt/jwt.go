@@ -16,20 +16,29 @@ import (
 	"time"
 
 	"github.com/okamyuji/boki3-quiz-go-htmx/internal/domain"
+	"github.com/okamyuji/boki3-quiz-go-htmx/internal/pkg/clock"
 	"github.com/okamyuji/boki3-quiz-go-htmx/internal/port"
 )
 
 // HS256Signer は HS256 (HMAC-SHA256) JWT を発行/検証する。
 type HS256Signer struct {
 	secret []byte
+	clock  clock.Clock
 }
 
 // NewHS256 は HS256Signer を生成する。secret は最低 32 バイトを推奨。
-func NewHS256(secret []byte) (*HS256Signer, error) {
+//
+// clk は exp (有効期限) 判定に使う現在時刻の供給源。nil の場合は本番用
+// clock.System{} を使う。テストでは clock.Fixed{} を注入して time.Now() への
+// 依存を排し、決定的に exp 判定を検証できる。
+func NewHS256(secret []byte, clk clock.Clock) (*HS256Signer, error) {
 	if len(secret) < 32 {
 		return nil, errors.New("jwt secret too short (need >= 32 bytes)")
 	}
-	return &HS256Signer{secret: secret}, nil
+	if clk == nil {
+		clk = clock.System{}
+	}
+	return &HS256Signer{secret: secret, clock: clk}, nil
 }
 
 var _ port.JWTSigner = (*HS256Signer)(nil)
@@ -129,7 +138,7 @@ func (s *HS256Signer) Parse(token string) (domain.JWTClaims, error) {
 		ExpiresAt: time.Unix(p.Exp, 0).UTC(),
 		JTI:       p.JTI,
 	}
-	if !time.Now().UTC().Before(c.ExpiresAt) {
+	if !s.clock.Now().Before(c.ExpiresAt) {
 		return domain.JWTClaims{}, errors.New("jwt: token expired")
 	}
 	return c, nil
