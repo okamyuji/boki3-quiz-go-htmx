@@ -24,7 +24,8 @@ func newSigner(t *testing.T) *jwt.HS256Signer {
 func TestSignAndParse(t *testing.T) {
 	t.Parallel()
 	s := newSigner(t)
-	now := time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
+	// 相対時刻を使う。固定日付だと exp がいずれ過去になり時限爆弾的に失敗する。
+	now := time.Now().UTC()
 	claims := domain.JWTClaims{
 		Subject: 42, Issuer: "boki3-quiz", Audience: "api",
 		IssuedAt: now, ExpiresAt: now.Add(time.Hour), JTI: "abc",
