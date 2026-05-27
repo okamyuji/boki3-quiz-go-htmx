@@ -443,13 +443,13 @@ func (h *Handler) ensureCSRFCookie(w http.ResponseWriter, r *http.Request) strin
 		return c.Value
 	}
 	token := randomToken(32)
-	h.setCookie(w, h.cfg.Cookie.CSRFName, token, false /* not HttpOnly: JS で読み再送 */)
+	h.setCSRFCookie(w, token)
 	return token
 }
 
 func (h *Handler) setSessionCookies(w http.ResponseWriter, s *domain.Session) {
-	h.setCookie(w, h.cfg.Cookie.SessionName, s.ID, true)
-	h.setCookie(w, h.cfg.Cookie.CSRFName, s.CSRFToken, false)
+	h.setSessionCookie(w, s.ID)
+	h.setCSRFCookie(w, s.CSRFToken)
 }
 
 func (h *Handler) clearSessionCookies(w http.ResponseWriter) {
@@ -464,16 +464,30 @@ func (h *Handler) clearSessionCookies(w http.ResponseWriter) {
 	})
 }
 
-func (h *Handler) setCookie(w http.ResponseWriter, name, value string, httpOnly bool) {
-	// セッション Cookie は常に HttpOnly=true を強制する。
-	// (CSRF Cookie は JS から読む要件があるため呼出側指定を維持)
-	effectiveHTTPOnly := httpOnly || name == h.cfg.Cookie.SessionName
-
-	http.SetCookie(w, &http.Cookie{ //nolint:gosec // Secure は実行時に Cookie.Secure で制御、Session は HttpOnly 強制
-		Name:     name,
+// setSessionCookie はセッション Cookie を設定する。
+// HttpOnly=true をリテラルで固定し、XSS によるセッション ID 窃取を防ぐ。
+// (リテラル固定により CodeQL go/cookie-httponly-not-set が静的に検証できる)
+func (h *Handler) setSessionCookie(w http.ResponseWriter, value string) {
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // Secure は実行時に Cookie.Secure で制御
+		Name:     h.cfg.Cookie.SessionName,
 		Value:    value,
 		Path:     "/",
-		HttpOnly: effectiveHTTPOnly,
+		HttpOnly: true,
+		Secure:   h.cfg.Cookie.Secure,
+		SameSite: http.SameSiteLaxMode,
+		Domain:   h.cfg.Cookie.Domain,
+	})
+}
+
+// setCSRFCookie は CSRF Cookie を設定する。
+// 二重送信 Cookie パターンのため JS から読んで再送する必要があり、HttpOnly=false を固定する。
+// セッション ID と異なり、値自体は CSRF トークン (リクエスト検証用) で機密性は低い。
+func (h *Handler) setCSRFCookie(w http.ResponseWriter, value string) {
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // CSRF cookie は JS から読む必要があり HttpOnly false 固定、Secure は実行時制御
+		Name:     h.cfg.Cookie.CSRFName,
+		Value:    value,
+		Path:     "/",
+		HttpOnly: false,
 		Secure:   h.cfg.Cookie.Secure,
 		SameSite: http.SameSiteLaxMode,
 		Domain:   h.cfg.Cookie.Domain,
