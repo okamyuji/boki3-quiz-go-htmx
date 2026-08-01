@@ -212,6 +212,92 @@ func TestE2ERegisterLoginQuizFlow(t *testing.T) {
 	}
 }
 
+// extractHiddenValue は HTML から name=... の input 値を取り出す。
+func extractHiddenValue(t *testing.T, body, name string) string {
+	t.Helper()
+	needle := `name="` + name + `" value="`
+	idx := strings.Index(body, needle)
+	if idx < 0 {
+		t.Fatalf("hidden input %q not found", name)
+	}
+	rest := body[idx+len(needle):]
+	end := strings.IndexByte(rest, '"')
+	if end < 0 {
+		t.Fatalf("hidden input %q not terminated", name)
+	}
+	return rest[:end]
+}
+
+// 回答導線: 出題 → 回答 → 「この問題の次回復習予定」表示 → 順序通りモードでは
+// 次の問題に前進する、を通しで検証する。
+func TestE2EAnswerShowsReviewScheduleAndSequentialAdvances(t *testing.T) {
+	t.Parallel()
+	fx := setupE2E(t)
+	ctx := context.Background()
+	// 2 問目を core_300 に追加して前進を観測可能にする。
+	res, err := fx.db.ExecContext(ctx,
+		`INSERT INTO questions(code, topic_id, question_type, difficulty, prompt, payload_json, answer_json, explanation, references_json, created_at)
+		 VALUES ('e2e-q2', 1, 'journal', 1, '売掛金 500 円を現金で回収した。', '{}', '{}', '解説2', NULL, 0)`)
+	if err != nil {
+		t.Fatalf("seed q2: %v", err)
+	}
+	q2ID, _ := res.LastInsertId()
+	if _, err := fx.db.ExecContext(ctx,
+		`INSERT INTO question_set_members(set_id, question_id, ord)
+		 SELECT id, ?, 2 FROM question_sets WHERE code = 'core_300'`, q2ID); err != nil {
+		t.Fatalf("seed q2 member: %v", err)
+	}
+	registerE2EUser(t, fx, "answerflow1")
+
+	// 1) 順序通りモードで出題 → 先頭の問題。
+	resp := mustGet(t, fx, "/quiz?set=core_300&mode=sequential")
+	b, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	body := string(b)
+	if !strings.Contains(body, "現金で 1000 円を売上げた") {
+		t.Fatalf("first question not shown; body=%s", body[:min(600, len(body))])
+	}
+
+	// 2) 正解を回答。
+	form := url.Values{
+		"csrf_token":       {extractHiddenValue(t, body, "csrf_token")},
+		"question_id":      {extractHiddenValue(t, body, "question_id")},
+		"set":              {extractHiddenValue(t, body, "set")},
+		"started_at":       {extractHiddenValue(t, body, "started_at")},
+		"started_sig":      {extractHiddenValue(t, body, "started_sig")},
+		"debit_account_1":  {"現金"},
+		"debit_amount_1":   {"1000"},
+		"credit_account_1": {"売上"},
+		"credit_amount_1":  {"1000"},
+	}
+	resp = mustPostForm(t, fx, "/quiz/answer", form)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("/quiz/answer status = %d, want 200", resp.StatusCode)
+	}
+	b, _ = io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	body = string(b)
+	if !strings.Contains(body, "正解") {
+		t.Fatalf("answer page missing result; body=%s", body[:min(600, len(body))])
+	}
+	// 表示は「この問題の次回復習予定」であり、旧ラベル「次回出題予定」は使わない。
+	if !strings.Contains(body, "この問題の次回復習予定") {
+		t.Fatalf("answer page missing review-schedule label; body=%s", body[:min(900, len(body))])
+	}
+	if strings.Contains(body, "<h3>次回出題予定</h3>") {
+		t.Fatalf("answer page still shows old misleading label")
+	}
+
+	// 3) 次の出題は 2 問目に前進している (順序通り)。
+	resp = mustGet(t, fx, "/quiz")
+	b, _ = io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	body = string(b)
+	if !strings.Contains(body, "売掛金 500 円を現金で回収した") {
+		t.Fatalf("sequential mode did not advance to q2; body=%s", body[:min(900, len(body))])
+	}
+}
+
 // registerE2EUser は登録フローを通してログイン済みセッションを作る。
 func registerE2EUser(t *testing.T, fx *e2eFixture, username string) {
 	t.Helper()

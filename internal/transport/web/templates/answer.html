@@ -6,8 +6,9 @@
     <p>{{.Explanation}}</p>
   </article>
   <article class="card">
-    <h3>次回出題予定</h3>
+    <h3>この問題の次回復習予定</h3>
     <p>{{.NextDueAt.Format "2006-01-02"}}</p>
+    <p class="meta">復習優先 (SRS) モードで、この日以降に再出題の候補になります。次の問題はすぐに続けられます。</p>
   </article>
   <div class="actions">
     <a class="btn" href="/quiz?set={{.ActiveSet}}&mode={{.Mode}}">次の問題へ</a>

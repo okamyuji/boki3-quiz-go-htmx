@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"time"
 
 	"github.com/okamyuji/boki3-quiz-go-htmx/internal/domain"
 	"github.com/okamyuji/boki3-quiz-go-htmx/internal/domain/grading"
@@ -60,7 +61,7 @@ func (s *QuizService) NextQuestion(ctx context.Context, userID int64, setCode st
 		r := s.rng()
 		return &all[r.IntN(len(all))], nil
 	case domain.QuizModeSequential:
-		return &all[0], nil
+		return s.pickSequential(ctx, userID, setCode, all)
 	case domain.QuizModeSRS, "":
 		return s.pickSRS(ctx, userID, all)
 	default:
@@ -68,11 +69,41 @@ func (s *QuizService) NextQuestion(ctx context.Context, userID int64, setCode st
 	}
 }
 
+// pickSequential はセット内でユーザが最後に回答した問題の次 (ord 順) を返す。
+// 末尾まで回答したら先頭に戻る。回答履歴がない場合と、最後に回答した問題が
+// セットから外れている場合は先頭を返す。
+func (s *QuizService) pickSequential(ctx context.Context, userID int64, setCode string, all []domain.Question) (*domain.Question, error) {
+	set, err := s.sets.GetByCode(ctx, setCode)
+	if err != nil {
+		return nil, fmt.Errorf("quiz sequential set: %w", err)
+	}
+	lastQID, err := s.attempts.LastQuestionIDInSet(ctx, userID, set.ID)
+	if errors.Is(err, domain.ErrNotFound) {
+		return &all[0], nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("quiz sequential last: %w", err)
+	}
+	for i := range all {
+		if all[i].ID == lastQID {
+			return &all[(i+1)%len(all)], nil
+		}
+	}
+	return &all[0], nil
+}
+
+// 弱点論点の集計窓と採用論点数。
+const (
+	weakTopicWindowDays = 7
+	weakTopicLimit      = 3
+)
+
 // pickSRS は学習モード SRS の選定ロジック。
 //
-// 既定重み: due 70% / 不正解履歴 20% / ランダム 10%。
-// due が空の場合は残り 30% を 20:10 比で再分配 (不正解 66.6% / ランダム 33.3%)。
-// 履歴フォールバックが空ならランダムに落ちる。
+// 既定重み: due 70% / 過去 7 日の誤答率上位論点 20% / 未着手問題 10%。
+// due が空の場合は残り 30% を 20:10 比で再分配 (弱点論点 66.6% / 未着手 33.3%)。
+// 弱点論点が空なら未着手へ、未着手も空なら全問ランダムに落ちる。
+// いずれの枠でも直前に出題した問題 (lastQID) は避ける。
 func (s *QuizService) pickSRS(ctx context.Context, userID int64, all []domain.Question) (*domain.Question, error) {
 	now := s.clock.Now()
 	due, err := s.srs.DueForUser(ctx, userID, now, 50)
@@ -91,19 +122,61 @@ func (s *QuizService) pickSRS(ctx context.Context, userID int64, all []domain.Qu
 		}
 	}
 	if r.Float64() < 2.0/3.0 {
-		attempts, err := s.attempts.ListByUser(ctx, userID, 50, 0)
-		if err == nil {
-			for _, a := range attempts {
-				if !a.IsCorrect && a.QuestionID != lastQID {
-					q, err := s.questions.GetByID(ctx, a.QuestionID)
-					if err == nil {
-						return q, nil
-					}
-				}
-			}
+		if q := s.pickWeakTopicAvoid(ctx, userID, all, lastQID, now, r); q != nil {
+			return q, nil
 		}
 	}
+	if q := s.pickUnattempted(ctx, userID, all, r); q != nil {
+		return q, nil
+	}
 	return pickRandomAvoid(all, lastQID, r), nil
+}
+
+// pickWeakTopicAvoid は過去 7 日の誤答率上位論点に属する問題から lastQID 以外を
+// 等確率で 1 件返す。照会失敗や候補なしは nil (次の枠へフォールバック)。
+func (s *QuizService) pickWeakTopicAvoid(ctx context.Context, userID int64, all []domain.Question, lastQID int64, now time.Time, r *rand.Rand) *domain.Question {
+	topics, err := s.attempts.WeakTopicIDs(ctx, userID, now.AddDate(0, 0, -weakTopicWindowDays), weakTopicLimit)
+	if err != nil || len(topics) == 0 {
+		return nil
+	}
+	weak := make(map[int64]bool, len(topics))
+	for _, id := range topics {
+		weak[id] = true
+	}
+	return pickCandidate(all, r, func(q *domain.Question) bool {
+		return weak[q.TopicID] && q.ID != lastQID
+	})
+}
+
+// pickUnattempted は未回答の問題から等確率で 1 件返す。
+// 直近出題問題 (lastQID) は定義上回答済みなので候補に入らない。
+// 照会失敗や候補なしは nil (ランダムへフォールバック)。
+func (s *QuizService) pickUnattempted(ctx context.Context, userID int64, all []domain.Question, r *rand.Rand) *domain.Question {
+	ids, err := s.attempts.AttemptedQuestionIDs(ctx, userID)
+	if err != nil {
+		return nil
+	}
+	attempted := make(map[int64]bool, len(ids))
+	for _, id := range ids {
+		attempted[id] = true
+	}
+	return pickCandidate(all, r, func(q *domain.Question) bool {
+		return !attempted[q.ID]
+	})
+}
+
+// pickCandidate は cond を満たす問題から等確率で 1 件返す (候補なしは nil)。
+func pickCandidate(all []domain.Question, r *rand.Rand, cond func(*domain.Question) bool) *domain.Question {
+	cands := make([]*domain.Question, 0, len(all))
+	for i := range all {
+		if cond(&all[i]) {
+			cands = append(cands, &all[i])
+		}
+	}
+	if len(cands) == 0 {
+		return nil
+	}
+	return cands[r.IntN(len(cands))]
 }
 
 // pickDueAvoid は due から lastQID 以外を 1 件返す (見つからなければ nil)。

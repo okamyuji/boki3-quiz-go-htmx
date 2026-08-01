@@ -63,6 +63,13 @@ type AttemptRepository interface {
 	StatsByTopic(ctx context.Context, userID int64) ([]domain.TopicStat, error)
 	DailyAccuracy(ctx context.Context, userID int64, days int, now time.Time) ([]domain.DailyAccuracy, error)
 	SummaryForUser(ctx context.Context, userID int64) (totalAttempts, totalCorrect int, err error)
+	// LastQuestionIDInSet は当該セット内でユーザが最後に回答した問題 ID を返す。
+	// 回答がなければ domain.ErrNotFound。
+	LastQuestionIDInSet(ctx context.Context, userID, setID int64) (int64, error)
+	// WeakTopicIDs は since 以降の回答を論点別に集計し、誤答を含む論点を誤答率降順で返す。
+	WeakTopicIDs(ctx context.Context, userID int64, since time.Time, limit int) ([]int64, error)
+	// AttemptedQuestionIDs はユーザが 1 回以上回答した問題 ID を昇順で返す。
+	AttemptedQuestionIDs(ctx context.Context, userID int64) ([]int64, error)
 }
 
 // UserPrefsRepository は user_prefs テーブルへの操作を提供する。
