@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/okamyuji/boki3-quiz-go-htmx/internal/domain"
+	"github.com/okamyuji/boki3-quiz-go-htmx/internal/domain/accounts"
 	"github.com/okamyuji/boki3-quiz-go-htmx/internal/domain/grading"
 	"github.com/okamyuji/boki3-quiz-go-htmx/seed"
 )
@@ -86,33 +87,11 @@ func TestGenerateVariantsAtMostThree(t *testing.T) {
 	}
 }
 
-// 3 級の標準勘定科目のみを使用する (誤字・級外科目の混入防止)。
+// 3 級の標準勘定科目 (accounts.Standard) のみを使用する (誤字・級外科目の混入防止)。
 func TestGenerateJournalAccountsWhitelisted(t *testing.T) {
 	t.Parallel()
 	allowed := map[string]bool{}
-	for _, a := range []string{
-		"現金", "小口現金", "当座預金", "普通預金", "定期預金", "現金過不足", "当座借越",
-		"売掛金", "クレジット売掛金", "買掛金", "受取手形", "支払手形",
-		"電子記録債権", "電子記録債務", "繰越商品",
-		"貸付金", "借入金", "手形貸付金", "手形借入金",
-		"立替金", "預り金", "所得税預り金", "社会保険料預り金",
-		"仮払金", "仮受金", "前払金", "前受金", "未収入金", "未払金",
-		"受取商品券", "差入保証金", "貯蔵品",
-		"仮払消費税", "仮受消費税", "未払消費税",
-		"仮払法人税等", "未払法人税等", "未払配当金", "貸倒引当金",
-		"建物", "備品", "車両運搬具", "土地",
-		"建物減価償却累計額", "備品減価償却累計額", "車両運搬具減価償却累計額",
-		"資本金", "利益準備金", "繰越利益剰余金",
-		"売上", "受取手数料", "受取家賃", "受取地代", "受取利息",
-		"雑益", "償却債権取立益", "固定資産売却益",
-		"仕入", "発送費", "給料", "法定福利費", "広告宣伝費",
-		"支払手数料", "支払利息", "旅費交通費",
-		"貸倒引当金繰入", "貸倒損失", "減価償却費",
-		"通信費", "消耗品費", "水道光熱費", "支払家賃", "支払地代",
-		"保険料", "修繕費", "雑損", "固定資産売却損", "租税公課", "法人税等", "損益",
-		"前払保険料", "前払家賃", "未払利息", "未払家賃",
-		"前受家賃", "前受地代", "未収利息", "未収家賃",
-	} {
+	for _, a := range accounts.Standard {
 		allowed[a] = true
 	}
 	for _, q := range seed.Generate() {

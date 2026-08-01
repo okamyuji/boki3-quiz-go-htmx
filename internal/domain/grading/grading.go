@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/okamyuji/boki3-quiz-go-htmx/internal/domain"
+	"github.com/okamyuji/boki3-quiz-go-htmx/internal/domain/accounts"
 )
 
 // IsCorrect は want (正答) と got (提出) が一致するか判定する。
@@ -42,11 +43,12 @@ func entrySetEqual(a, b []domain.JournalEntry) bool {
 	return true
 }
 
-// normalize は空行を除き、(科目, 金額) を辞書順にソートしたコピーを返す。
+// normalize は空行を除き、科目名を標準表記へ正規化 (accounts.Normalize) した上で
+// (科目, 金額) を辞書順にソートしたコピーを返す。
 func normalize(entries []domain.JournalEntry) []domain.JournalEntry {
 	out := make([]domain.JournalEntry, 0, len(entries))
 	for _, e := range entries {
-		acct := strings.TrimSpace(e.Account)
+		acct := accounts.Normalize(strings.TrimSpace(e.Account))
 		if acct == "" && e.Amount == 0 {
 			continue
 		}

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/okamyuji/boki3-quiz-go-htmx/internal/domain"
+	"github.com/okamyuji/boki3-quiz-go-htmx/internal/domain/accounts"
 	"github.com/okamyuji/boki3-quiz-go-htmx/internal/port"
 	"github.com/okamyuji/boki3-quiz-go-htmx/internal/transport/middleware"
 	"github.com/okamyuji/boki3-quiz-go-htmx/internal/transport/svg"
@@ -130,13 +131,14 @@ type view struct {
 	FlashOK    string
 	Summary    *domain.StatsSummary
 	// quiz
-	Sets         []domain.QuestionSet
-	ActiveSet    string
-	Mode         string
-	Question     *domain.Question
-	TopicName    string
-	StartedAtMs  int64
-	StartedAtSig string // started_at の HMAC-SHA256 (改ざん検知)
+	Sets           []domain.QuestionSet
+	ActiveSet      string
+	Mode           string
+	Question       *domain.Question
+	TopicName      string
+	StartedAtMs    int64
+	StartedAtSig   string   // started_at の HMAC-SHA256 (改ざん検知)
+	AccountOptions []string // 仕訳入力の勘定科目候補 (datalist)
 	// answer
 	Correct     bool
 	Explanation string
@@ -287,6 +289,9 @@ func (h *Handler) getQuiz(w http.ResponseWriter, r *http.Request) {
 		v.TopicName = h.topicNameOf[question.TopicID]
 		v.StartedAtMs = time.Now().UnixMilli()
 		v.StartedAtSig = h.signStartedAt(question.ID, v.StartedAtMs)
+		if question.QuestionType == domain.QuestionTypeJournal {
+			v.AccountOptions = accounts.Standard
+		}
 	}
 	if summary, err := h.cfg.Stats.Summary(r.Context(), user.ID); err == nil {
 		v.Summary = &summary

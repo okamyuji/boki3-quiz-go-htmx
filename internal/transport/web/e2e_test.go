@@ -257,6 +257,16 @@ func TestE2EAnswerShowsReviewScheduleAndSequentialAdvances(t *testing.T) {
 	if !strings.Contains(body, "現金で 1000 円を売上げた") {
 		t.Fatalf("first question not shown; body=%s", body[:min(600, len(body))])
 	}
+	// 勘定科目入力には標準科目の候補 (datalist) が表示される。
+	if !strings.Contains(body, `<datalist id="account-options">`) {
+		t.Fatalf("account datalist missing from quiz page")
+	}
+	if !strings.Contains(body, `<option value="売上">`) || !strings.Contains(body, `<option value="繰越利益剰余金">`) {
+		t.Fatalf("standard account options missing from datalist")
+	}
+	if !strings.Contains(body, `list="account-options"`) {
+		t.Fatalf("account inputs must reference the datalist")
+	}
 
 	// 2) 正解を回答。
 	form := url.Values{

@@ -31,18 +31,21 @@
       <input type="hidden" name="started_at" value="{{.StartedAtMs}}">
       <input type="hidden" name="started_sig" value="{{.StartedAtSig}}">
       {{if eq .Question.QuestionType "journal"}}
+      <datalist id="account-options">
+        {{range .AccountOptions}}<option value="{{.}}">{{end}}
+      </datalist>
       <fieldset class="entries">
         <legend>借方</legend>
-        <input name="debit_account_1" placeholder="勘定科目 1">
+        <input name="debit_account_1" list="account-options" placeholder="勘定科目 1">
         <input name="debit_amount_1" type="number" min="0" placeholder="金額">
-        <input name="debit_account_2" placeholder="勘定科目 2 (任意)">
+        <input name="debit_account_2" list="account-options" placeholder="勘定科目 2 (任意)">
         <input name="debit_amount_2" type="number" min="0" placeholder="金額">
       </fieldset>
       <fieldset class="entries">
         <legend>貸方</legend>
-        <input name="credit_account_1" placeholder="勘定科目 1">
+        <input name="credit_account_1" list="account-options" placeholder="勘定科目 1">
         <input name="credit_amount_1" type="number" min="0" placeholder="金額">
-        <input name="credit_account_2" placeholder="勘定科目 2 (任意)">
+        <input name="credit_account_2" list="account-options" placeholder="勘定科目 2 (任意)">
         <input name="credit_amount_2" type="number" min="0" placeholder="金額">
       </fieldset>
       {{else}}
