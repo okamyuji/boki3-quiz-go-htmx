@@ -13,6 +13,7 @@ feedflow (feedflow-go-htmx) が使用中の既存EC2に同居する構成です�
           → SQLite (/mnt/feedflow-data/boki3 に永続化。feedflowのデータ用EBSを共用)
 ```
 
+- **イメージはローカルでarm64ビルドして転送し、EC2側は `docker load` と起動だけを行います。** 1GB RAMの共有インスタンス上でGoビルドを走らせるとメモリ枯渇でfeedflowを巻き込むためです（2026-08-01の障害で実証済み）。そのためローカルにDocker (buildx) が必要です。
 - feedflowリポジトリへの変更はゼロです。nginxが `conf.d/*.conf` を丸ごとincludeし、`/etc/feedflow/conf.d` と `/etc/feedflow/tls` をホストからマウントしているため、ファイルを置くだけで済みます。
 - boki3のnginx serverブロックはDocker内蔵DNS (`resolver 127.0.0.11`) + 変数proxy_passで遅延解決するため、boki3が停止していてもfeedflowのnginxの起動・reloadは失敗しません。
 - アプリの `.env` (JWTシークレット) は `/home/ec2-user/boki3.env` に永続化し、初回デプロイ時のみ自動生成します。再デプロイでセッションは無効になりません。

@@ -1,5 +1,8 @@
-# アプリの配送と起動を行います。git remoteに依存せず、ローカルからtar.gzを転送します。
-# 同居先はfeedflowのterraformが管理する既存EC2で、SSH到達にはfeedflowの鍵を再利用します。
+# アプリの配送と起動を行います。イメージはローカルでarm64ビルドして転送し、
+# EC2側は docker load と起動だけを行います。
+# 同居先EC2はt4g.micro (1GB RAM) をfeedflowと共有しており、EC2上でのGoビルドは
+# メモリを食い尽くして同居アプリを巻き込むため行いません (2026-08-01の障害の再発防止)。
+# SSH到達にはfeedflowの鍵を再利用します。
 #
 # feedflow側の前提 (feedflowのterraformが構築済みであること):
 #   - Docker / docker compose が導入済み
@@ -9,22 +12,20 @@
 #   - データ用EBSが /mnt/feedflow-data へマウント済み
 
 locals {
-  repo_root   = abspath("${path.module}/../..")
-  tmp_dir     = abspath("${path.module}/.terraform-tmp")
-  bundle_path = "${local.tmp_dir}/boki3_bundle.tar.gz"
+  repo_root  = abspath("${path.module}/../..")
+  tmp_dir    = abspath("${path.module}/.terraform-tmp")
+  image_path = "${local.tmp_dir}/boki3-image.tar.gz"
 
-  # 配送対象です。埋め込み資産 (テンプレート/静的ファイル/マイグレーション/シード) は
-  # internal/ と seed/ の下にあるため、この最小集合でビルドできます。
-  bundle_items = "cmd internal seed go.mod go.sum Dockerfile compose.yml"
-
-  # 配送対象のチェックサムでバンドル再生成と再デプロイのトリガーを作ります。
-  bundle_files = sort(concat(
+  # ビルド入力のチェックサムでイメージ再ビルドと再デプロイのトリガーを作ります。
+  # 埋め込み資産 (テンプレート/静的ファイル/マイグレーション/シード) は
+  # internal/ と seed/ の下にあるため、この集合がビルド入力のすべてです。
+  build_files = sort(concat(
     tolist(fileset(local.repo_root, "cmd/**")),
     tolist(fileset(local.repo_root, "internal/**")),
     tolist(fileset(local.repo_root, "seed/**")),
     ["go.mod", "go.sum", "Dockerfile", "compose.yml"],
   ))
-  bundle_hash = sha256(join("", [for f in local.bundle_files : filesha256("${local.repo_root}/${f}")]))
+  build_hash = sha256(join("", [for f in local.build_files : filesha256("${local.repo_root}/${f}")]))
 
   # nginxのreal_ip復元用にCloudflareの全IP範囲からset_real_ip_from行を組み立てます。
   cloudflare_cidrs = concat(
@@ -39,28 +40,29 @@ locals {
   })
 }
 
-# tar.gzをローカルで生成します。配送対象が変わると再生成します。
-resource "null_resource" "bundle" {
+# arm64イメージをローカルでビルドしてtar.gzへ書き出します。ビルド入力が変わると再生成します。
+resource "null_resource" "image" {
   triggers = {
-    bundle_hash = local.bundle_hash
+    build_hash = local.build_hash
   }
 
   provisioner "local-exec" {
-    command = "mkdir -p ${local.tmp_dir} && tar -czf ${local.bundle_path} --exclude=.DS_Store -C ${local.repo_root} ${local.bundle_items}"
+    working_dir = local.repo_root
+    command     = "mkdir -p ${local.tmp_dir} && docker buildx build --platform linux/arm64 --load -t boki3-quiz:dev . && docker save boki3-quiz:dev | gzip > ${local.image_path}"
   }
 }
 
 resource "null_resource" "deploy" {
-  # バンドル内容や証明書やnginx confや接続先EIPが変わると再実行します。
+  # ビルド入力や証明書やnginx confや接続先EIPが変わると再実行します。
   triggers = {
-    bundle_hash = local.bundle_hash
-    cert_id     = cloudflare_origin_ca_certificate.origin.id
-    hostname    = var.hostname
-    nginx_conf  = sha256(local.nginx_conf)
-    origin_ip   = var.origin_public_ip
+    build_hash = local.build_hash
+    cert_id    = cloudflare_origin_ca_certificate.origin.id
+    hostname   = var.hostname
+    nginx_conf = sha256(local.nginx_conf)
+    origin_ip  = var.origin_public_ip
   }
 
-  depends_on = [null_resource.bundle]
+  depends_on = [null_resource.image]
 
   connection {
     type        = "ssh"
@@ -69,10 +71,15 @@ resource "null_resource" "deploy" {
     private_key = file(var.ssh_private_key_path)
   }
 
-  # アプリバンドルを転送します。
+  # ビルド済みイメージとcompose定義を転送します。
   provisioner "file" {
-    source      = local.bundle_path
-    destination = "/home/ec2-user/boki3_bundle.tar.gz"
+    source      = local.image_path
+    destination = "/home/ec2-user/boki3-image.tar.gz"
+  }
+
+  provisioner "file" {
+    source      = "${local.repo_root}/compose.yml"
+    destination = "/home/ec2-user/boki3-compose.yml"
   }
 
   # nginxのserverブロックを転送します。feedflowのconf.dへドロップインします。
@@ -108,10 +115,13 @@ resource "null_resource" "deploy" {
       "sudo mkdir -p /mnt/feedflow-data/boki3",
       "sudo chown 65532:65532 /mnt/feedflow-data/boki3",
 
-      # アプリを展開します。.envは展開先の外 (boki3.env) に永続化し、再デプロイで消しません。
+      # ビルド済みイメージを取り込みます。EC2上ではビルドを行いません。
+      "sudo docker load -i /home/ec2-user/boki3-image.tar.gz",
+      "rm -f /home/ec2-user/boki3-image.tar.gz",
+
+      # composeプロジェクトを配置します。.envは配置先の外 (boki3.env) に永続化し、再デプロイで消しません。
       "rm -rf /home/ec2-user/boki3 && mkdir -p /home/ec2-user/boki3",
-      "tar -xzf /home/ec2-user/boki3_bundle.tar.gz -C /home/ec2-user/boki3",
-      "rm -f /home/ec2-user/boki3_bundle.tar.gz",
+      "mv /home/ec2-user/boki3-compose.yml /home/ec2-user/boki3/compose.yml",
 
       # JWTシークレットは初回のみ生成します (再生成すると既存セッション/トークンが無効になるため)。
       "test -f /home/ec2-user/boki3.env || printf 'BOKI3_JWT_SECRET=%s\\n' \"$(openssl rand -hex 64)\" > /home/ec2-user/boki3.env",
@@ -119,8 +129,8 @@ resource "null_resource" "deploy" {
       "cp /home/ec2-user/boki3.env /home/ec2-user/boki3/.env",
       "chmod 600 /home/ec2-user/boki3/.env",
 
-      # ビルドして起動します。
-      "cd /home/ec2-user/boki3 && sudo docker compose --env-file .env up -d --build",
+      # 転送済みイメージで起動します。EC2上でのビルドは行いません (--no-build)。
+      "cd /home/ec2-user/boki3 && sudo docker compose --env-file .env up -d --no-build",
 
       # Origin CA証明書と鍵を配置します。鍵は所有者のみ読めるようにします。
       "sudo cp /home/ec2-user/boki3.crt /etc/feedflow/tls/boki3.crt",
