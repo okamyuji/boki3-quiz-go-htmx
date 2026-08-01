@@ -81,7 +81,7 @@ func setupE2E(t *testing.T) *e2eFixture {
 	mux := http.NewServeMux()
 	webH := web.NewHandler(web.Config{
 		Templates: tpl, Auth: authSvc, Quiz: quizSvc, Stats: statsSvc,
-		Sets: sets, Questions: questions, Topics: topics, Logger: logger,
+		Sets: sets, Prefs: reposqlite.NewUserPrefsRepo(db), Questions: questions, Topics: topics, Logger: logger,
 		LoginRateLimit:  ratelimit.NewFixedWindow(100, time.Minute, clk),
 		GlobalRateLimit: ratelimit.NewSlidingWindow(1000, time.Minute, clk),
 		Cookie:          web.CookieConfig{SessionName: "boki3_session", CSRFName: "boki3_csrf"},
@@ -209,6 +209,89 @@ func TestE2ERegisterLoginQuizFlow(t *testing.T) {
 	_ = resp.Body.Close()
 	if !strings.Contains(string(bodyBytes), "現金で 1000 円を売上げた") {
 		t.Fatalf("/quiz body does not contain prompt; body=%s", string(bodyBytes)[:min(400, len(bodyBytes))])
+	}
+}
+
+// registerE2EUser は登録フローを通してログイン済みセッションを作る。
+func registerE2EUser(t *testing.T, fx *e2eFixture, username string) {
+	t.Helper()
+	resp := mustGet(t, fx, "/register")
+	csrf := extractCSRF(t, resp)
+	_ = resp.Body.Close()
+	resp = mustPostForm(t, fx, "/register", url.Values{
+		"csrf_token": {csrf},
+		"username":   {username},
+		"password":   {"P@ssw0rd!Strong"},
+	})
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("/register status = %d", resp.StatusCode)
+	}
+	_ = resp.Body.Close()
+}
+
+func TestE2EQuizSetModeRestoredFromSavedPrefs(t *testing.T) {
+	t.Parallel()
+	fx := setupE2E(t)
+	// 2 つ目のセットを用意して切り替え先にする。
+	ctx := context.Background()
+	res, err := fx.db.ExecContext(ctx,
+		`INSERT INTO question_sets(code, name, description, target_size) VALUES ('journal_150', '仕訳150', '', 150)`)
+	if err != nil {
+		t.Fatalf("seed second set: %v", err)
+	}
+	setID, _ := res.LastInsertId()
+	if _, err := fx.db.ExecContext(ctx,
+		`INSERT INTO question_set_members(set_id, question_id, ord) SELECT ?, id, 1 FROM questions LIMIT 1`, setID); err != nil {
+		t.Fatalf("seed second set member: %v", err)
+	}
+	registerE2EUser(t, fx, "prefsuser1")
+
+	// 切り替え (明示クエリ) → 保存される。
+	resp := mustGet(t, fx, "/quiz?set=journal_150&mode=random")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("/quiz with query status = %d, want 200", resp.StatusCode)
+	}
+	_ = resp.Body.Close()
+
+	// パラメータ無しの再訪問 (ログインし直し相当) で保存値が復帰する。
+	resp = mustGet(t, fx, "/quiz")
+	b, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	body := string(b)
+	if !strings.Contains(body, `value="journal_150" selected`) {
+		t.Fatalf("saved set not restored; body=%s", body[:min(600, len(body))])
+	}
+	if !strings.Contains(body, `value="random" selected`) {
+		t.Fatalf("saved mode not restored; body=%s", body[:min(600, len(body))])
+	}
+
+	// 無効なクエリ値は無視され、保存済みの選択が使われる (保存値も汚染されない)。
+	resp = mustGet(t, fx, "/quiz?set=no_such_set&mode=bogus")
+	b, _ = io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	body = string(b)
+	if !strings.Contains(body, `value="journal_150" selected`) {
+		t.Fatalf("invalid set query must fall back to stored; body=%s", body[:min(600, len(body))])
+	}
+	if !strings.Contains(body, `value="random" selected`) {
+		t.Fatalf("invalid mode query must fall back to stored; body=%s", body[:min(600, len(body))])
+	}
+}
+
+func TestE2EQuizDefaultsForNewUserWithoutPrefs(t *testing.T) {
+	t.Parallel()
+	fx := setupE2E(t)
+	registerE2EUser(t, fx, "prefsuser2")
+
+	resp := mustGet(t, fx, "/quiz")
+	b, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	body := string(b)
+	if !strings.Contains(body, `value="core_300" selected`) {
+		t.Fatalf("default set not selected; body=%s", body[:min(600, len(body))])
+	}
+	if !strings.Contains(body, `value="srs" selected`) {
+		t.Fatalf("default mode not selected; body=%s", body[:min(600, len(body))])
 	}
 }
 

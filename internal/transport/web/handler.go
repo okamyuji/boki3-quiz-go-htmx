@@ -10,6 +10,7 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -33,6 +34,7 @@ type Config struct {
 	Quiz            port.QuizService
 	Stats           port.StatsService
 	Sets            port.SetRepository
+	Prefs           port.UserPrefsRepository
 	Questions       port.QuestionRepository
 	Topics          port.TopicRepository
 	Logger          *slog.Logger
@@ -250,23 +252,36 @@ func (h *Handler) getQuiz(w http.ResponseWriter, r *http.Request) {
 	v := h.baseView(r, "学習")
 	user := middleware.UserFrom(r.Context())
 	q := r.URL.Query()
-	setCode := q.Get("set")
-	if setCode == "" {
-		setCode = domain.SetCodeCore
-	}
-	mode := q.Get("mode")
-	if mode == "" {
-		mode = "srs"
-	}
 	sets, err := h.cfg.Sets.ListAll(r.Context())
 	if err != nil {
 		h.cfg.Logger.Error("sets list failed", "err", err)
 	}
 	v.Sets = sets
-	v.ActiveSet = setCode
-	v.Mode = mode
 
-	question, err := h.cfg.Quiz.NextQuestion(r.Context(), user.ID, setCode, domain.QuizMode(mode))
+	var stored *domain.UserPrefs
+	if p, err := h.cfg.Prefs.Get(r.Context(), user.ID); err == nil {
+		stored = p
+	} else if !errors.Is(err, domain.ErrNotFound) {
+		h.cfg.Logger.Error("user prefs get failed", "err", err)
+	}
+	setCode, mode, save := resolveQuizPrefs(quizPrefsInput{
+		QuerySet:  q.Get("set"),
+		QueryMode: q.Get("mode"),
+		Stored:    stored,
+		SetExists: func(code string) bool {
+			return slices.ContainsFunc(sets, func(s domain.QuestionSet) bool { return s.Code == code })
+		},
+	})
+	if save {
+		prefs := domain.UserPrefs{UserID: user.ID, QuizSet: setCode, QuizMode: mode, UpdatedAt: time.Now().UTC()}
+		if err := h.cfg.Prefs.Upsert(r.Context(), &prefs); err != nil {
+			h.cfg.Logger.Error("user prefs save failed", "err", err)
+		}
+	}
+	v.ActiveSet = setCode
+	v.Mode = string(mode)
+
+	question, err := h.cfg.Quiz.NextQuestion(r.Context(), user.ID, setCode, mode)
 	if err == nil {
 		v.Question = question
 		v.TopicName = h.topicNameOf[question.TopicID]

@@ -28,19 +28,19 @@ func TestMigrateAppliesInitOnce(t *testing.T) {
 	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM schema_migrations`).Scan(&v); err != nil {
 		t.Fatalf("count: %v", err)
 	}
-	if v != 1 {
-		t.Fatalf("applied count = %d, want 1", v)
+	if v != 2 {
+		t.Fatalf("applied count = %d, want 2", v)
 	}
 
-	// 二度目の適用は idempotent (再度 0001 が記録されない)。
+	// 二度目の適用は idempotent (適用済みマイグレーションが再度記録されない)。
 	if err := repo.Migrate(ctx, db); err != nil {
 		t.Fatalf("Migrate second: %v", err)
 	}
 	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM schema_migrations`).Scan(&v); err != nil {
 		t.Fatalf("count: %v", err)
 	}
-	if v != 1 {
-		t.Fatalf("applied count after second = %d, want 1", v)
+	if v != 2 {
+		t.Fatalf("applied count after second = %d, want 2", v)
 	}
 }
 
@@ -56,7 +56,7 @@ func TestMigrateCreatesExpectedTables(t *testing.T) {
 	if err := repo.Migrate(context.Background(), db); err != nil {
 		t.Fatalf("Migrate: %v", err)
 	}
-	want := []string{"users", "sessions", "jwt_revocations", "topics", "questions", "question_sets", "question_set_members", "attempts", "srs_states"}
+	want := []string{"users", "sessions", "jwt_revocations", "topics", "questions", "question_sets", "question_set_members", "attempts", "srs_states", "user_prefs"}
 	for _, tbl := range want {
 		var got string
 		err := db.QueryRowContext(context.Background(),

@@ -65,6 +65,12 @@ type AttemptRepository interface {
 	SummaryForUser(ctx context.Context, userID int64) (totalAttempts, totalCorrect int, err error)
 }
 
+// UserPrefsRepository は user_prefs テーブルへの操作を提供する。
+type UserPrefsRepository interface {
+	Get(ctx context.Context, userID int64) (*domain.UserPrefs, error)
+	Upsert(ctx context.Context, p *domain.UserPrefs) error
+}
+
 // SRSStateRepository は srs_states テーブルへの操作を提供する。
 type SRSStateRepository interface {
 	Upsert(ctx context.Context, s *srs.State) error
