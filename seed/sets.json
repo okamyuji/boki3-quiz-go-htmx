@@ -1,5 +1,5 @@
 [
-  {"code": "core_300",          "name": "コア300", "description": "頻出論点を網羅した基本300問", "target_size": 300},
-  {"code": "journal_240",       "name": "仕訳240", "description": "仕訳に特化した240問",       "target_size": 240},
-  {"code": "comprehensive_300", "name": "総合300", "description": "総合問題と決算整理を含む300問", "target_size": 300}
+  {"code": "core_300",          "name": "コア (全論点1周)", "description": "全文型の代表1問と選択式で全論点を一周する133問", "target_size": 133},
+  {"code": "journal_240",       "name": "仕訳総合",        "description": "仕訳問題を全バリアント収録した257問",             "target_size": 257},
+  {"code": "comprehensive_300", "name": "全問網羅",        "description": "選択式を含む全289問",                         "target_size": 289}
 ]

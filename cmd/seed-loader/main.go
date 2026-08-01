@@ -1,11 +1,11 @@
-// Package main は seed パッケージの Bootstrap を呼んで DB に topics/sets/questions を投入する CLI。
+// Package main は seed パッケージの Sync を呼んで DB を現行の問題バンクへ収束させる CLI。
 //
 // 使用例:
 //
 //	go run ./cmd/seed-loader -db ./boki3-quiz.db
 //
-// Bootstrap は idempotent (3 テーブルすべて空の場合のみ投入) なので、開発中の再実行も安全。
-// 既存 DB をリセットしたい場合は -force を指定する。
+// Sync は idempotent (code キーで upsert し、バンク外の問題は出題対象から除外) なので、
+// 開発中の再実行も安全。既存 DB を完全にリセットしたい場合は -force を指定する。
 package main
 
 import (
@@ -60,7 +60,7 @@ func run(args []string) error {
 		}
 	}
 
-	if err := seed.Bootstrap(ctx, db); err != nil {
+	if err := seed.Sync(ctx, db); err != nil {
 		return err
 	}
 	var nT, nS, nQ int

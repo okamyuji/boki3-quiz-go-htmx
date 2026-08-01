@@ -6,6 +6,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -53,19 +54,14 @@ func LoadSets() ([]SetSeed, error) {
 	return out, nil
 }
 
-// Bootstrap は topics / sets / questions が空であればまとめて投入する。
-// 既に何らかのデータが入っていれば no-op (idempotent)。
+// Sync は DB の問題バンクを現行の Generate() へ収束させる (idempotent)。
 //
-// 部分投入の不整合を避けるため、3 テーブルすべて空のときだけ走らせる。
-func Bootstrap(ctx context.Context, db *sql.DB) error {
-	empty, err := allEmpty(ctx, db)
-	if err != nil {
-		return err
-	}
-	if !empty {
-		return nil
-	}
-
+//   - topics / sets / questions を code キーで upsert する。
+//   - 現行バンクに存在しない問題は、セット所属と SRS 状態を除去して
+//     出題対象から外す。問題行と attempts は履歴表示のために保持する。
+//
+// アプリ起動時に毎回呼ばれる前提で、全体を 1 トランザクションで実行する。
+func Sync(ctx context.Context, db *sql.DB) error {
 	topics, err := LoadTopics()
 	if err != nil {
 		return err
@@ -78,7 +74,7 @@ func Bootstrap(ctx context.Context, db *sql.DB) error {
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("bootstrap begin: %w", err)
+		return fmt.Errorf("sync begin: %w", err)
 	}
 	committed := false
 	defer func() {
@@ -96,29 +92,36 @@ func Bootstrap(ctx context.Context, db *sql.DB) error {
 	if err := upsertQuestionsTx(ctx, tx, questions); err != nil {
 		return err
 	}
+	if err := retireStaleQuestionsTx(ctx, tx, questions); err != nil {
+		return err
+	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("bootstrap commit: %w", err)
+		return fmt.Errorf("sync commit: %w", err)
 	}
 	committed = true
 	return nil
 }
 
-func allEmpty(ctx context.Context, db *sql.DB) (bool, error) {
-	for _, q := range []string{
-		`SELECT COUNT(*) FROM topics`,
-		`SELECT COUNT(*) FROM question_sets`,
-		`SELECT COUNT(*) FROM questions`,
-	} {
-		var n int
-		if err := db.QueryRowContext(ctx, q).Scan(&n); err != nil {
-			return false, fmt.Errorf("count check: %w", err)
-		}
-		if n > 0 {
-			return false, nil
-		}
+// retireStaleQuestionsTx は現行バンクに無い問題のセット所属と SRS 状態を削除する。
+func retireStaleQuestionsTx(ctx context.Context, tx *sql.Tx, questions []Question) error {
+	codes := make([]any, 0, len(questions))
+	marks := make([]string, 0, len(questions))
+	for i := range questions {
+		codes = append(codes, questions[i].Code)
+		marks = append(marks, "?")
 	}
-	return true, nil
+	in := strings.Join(marks, ",")
+	staleFilter := `question_id IN (SELECT id FROM questions WHERE code NOT IN (` + in + `))`
+	if _, err := tx.ExecContext(ctx,
+		`DELETE FROM question_set_members WHERE `+staleFilter, codes...); err != nil { //nolint:gosec // staleFilter は "?" プレースホルダのみで構成
+		return fmt.Errorf("retire stale members: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx,
+		`DELETE FROM srs_states WHERE `+staleFilter, codes...); err != nil { //nolint:gosec // staleFilter は "?" プレースホルダのみで構成
+		return fmt.Errorf("retire stale srs: %w", err)
+	}
+	return nil
 }
 
 func upsertTopicsTx(ctx context.Context, tx *sql.Tx, topics []TopicSeed) error {

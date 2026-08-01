@@ -11,7 +11,7 @@
   {"code": "wages",        "name": "給与・賞与",     "ord": 10},
   {"code": "capital",      "name": "資本",           "ord": 11},
   {"code": "adjustment",   "name": "決算整理",       "ord": 12},
-  {"code": "trial_balance","name": "試算表",         "ord": 13},
+  {"code": "trial_balance","name": "試算表・勘定記入", "ord": 13},
   {"code": "worksheet",    "name": "精算表・財務諸表", "ord": 14},
-  {"code": "slip",         "name": "伝票",           "ord": 15}
+  {"code": "slip",         "name": "伝票・補助簿",     "ord": 15}
 ]

@@ -66,7 +66,7 @@ func run(ctx context.Context) error {
 	// 起動時 auto-seed (topics/sets/questions が全て空のときだけ実行する idempotent な処理)。
 	// BOKI3_SKIP_SEED=true を指定すれば抑止できる (運用 DB の安全側既定)。
 	if !envBool("BOKI3_SKIP_SEED", false) {
-		if err := seed.Bootstrap(context.Background(), db); err != nil {
+		if err := seed.Sync(context.Background(), db); err != nil {
 			return err
 		}
 	}
