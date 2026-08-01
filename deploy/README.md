@@ -7,7 +7,7 @@ feedflow (feedflow-go-htmx) が使用中の既存EC2に同居する構成です�
 ```text
 ブラウザ
   → Cloudflare (DNSプロキシ / エッジHTTPS終端 / Access認証: 本人メールのみ)
-    → EC2 (feedflowのterraformが所有: t4g.micro, EIP, SGはCloudflareエッジIPのみ許可)
+    → EC2 (feedflowのterraformが所有: t4g.micro, EIP。SGはアプリポート443/80をCloudflareエッジIPのみに、SSHは運用者のIP/32のみに個別に制限)
       → feedflowのnginx (443をSNIで振り分け。/etc/feedflow/conf.d/boki3.conf をドロップイン)
         → boki3-app コンテナ (共有ネットワーク feedflow_internal 上、ポート非公開)
           → SQLite (/mnt/feedflow-data/boki3 に永続化。feedflowのデータ用EBSを共用)
@@ -45,5 +45,5 @@ apply後、`terraform output app_url` のURLへアクセスし、Cloudflare Acce
 
 ## 注意
 
-- feedflow側で `terraform apply`（EC2の再作成を伴う変更）を行った場合、boki3の配置物（コンテナ・conf・証明書・データ）は失われるため、boki3側でも `terraform apply` の再実行が必要です（`null_resource.deploy` は `terraform taint null_resource.deploy` で強制再実行できます）。SQLiteのデータはEBS上にあるためEC2再作成でも保持されますが、EBSごと作り直した場合は失われます。
+- feedflow側で `terraform apply`（EC2の再作成を伴う変更）を行った場合、boki3の配置物（コンテナ・nginx conf・証明書）は失われるため、boki3側でも `terraform apply` の再実行が必要です（`null_resource.deploy` は `terraform taint null_resource.deploy` で強制再実行できます）。SQLiteのデータは追加EBS上にあるため、同じEBSがアタッチされ続ける限りEC2再作成でも保持されます。失われるのはEBSボリューム自体を作り直した場合だけです。
 - feedflowのcomposeを `down` するとき、boki3のコンテナが `feedflow_internal` に接続中だとネットワーク削除に失敗します。先に `cd /home/ec2-user/boki3 && sudo docker compose down` を実行してください。

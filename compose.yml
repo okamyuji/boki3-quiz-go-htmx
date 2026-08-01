@@ -13,6 +13,12 @@ services:
       # ハードコードするとホストarch変更時にexec format errorで壊れるため指定しません。
     image: boki3-quiz:${BOKI3_VERSION:-dev}
     restart: unless-stopped
+    # 1GB RAMのt4g.microをfeedflowと共有するため、メモリ暴走で同居アプリを
+    # 巻き込まないよう上限を設けます。
+    deploy:
+      resources:
+        limits:
+          memory: 256m
     environment:
       BOKI3_LISTEN: ":8080"
       BOKI3_DB_PATH: "/data/boki3-quiz.db"
