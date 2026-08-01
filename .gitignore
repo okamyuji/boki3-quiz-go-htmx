@@ -22,6 +22,15 @@ data/
 # Build artifacts
 coverage.txt
 coverage.html
+build.err
+
+# Terraform (deploy/terraform)
+deploy/terraform/.terraform/
+deploy/terraform/.terraform-tmp/
+deploy/terraform/terraform.tfstate
+deploy/terraform/terraform.tfstate.backup
+deploy/terraform/secrets.auto.tfvars
+deploy/terraform/*.pem
 
 # Playwright / Node
 e2e/playwright/node_modules/
