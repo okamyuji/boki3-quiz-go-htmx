@@ -345,6 +345,100 @@ func TestPickSRSFallsBackToRandomWhenWeakAndUnattemptedLookupsFail(t *testing.T)
 	}
 }
 
+// mapQuestionsRepo は GetByID のみ実体を持つ questions リポジトリのフェイク。
+type mapQuestionsRepo map[int64]domain.Question
+
+func (m mapQuestionsRepo) GetByID(_ context.Context, id int64) (*domain.Question, error) {
+	if q, ok := m[id]; ok {
+		return &q, nil
+	}
+	return nil, domain.ErrNotFound
+}
+func (m mapQuestionsRepo) GetByCode(context.Context, string) (*domain.Question, error) {
+	return nil, domain.ErrNotFound
+}
+func (m mapQuestionsRepo) ListBySet(context.Context, string) ([]domain.Question, error) {
+	return nil, nil
+}
+func (m mapQuestionsRepo) Search(context.Context, domain.QuestionFilter) ([]domain.Question, error) {
+	return nil, nil
+}
+
+// due に lastQID 以外の候補がある限り、必ずそれを返す (nil にならない)。
+func TestPickDueAvoidAlwaysReturnsNonLastCandidate(t *testing.T) {
+	t.Parallel()
+	r := rand.New(rand.NewPCG(21, 22))
+	svc := &QuizService{
+		questions: mapQuestionsRepo{1: {ID: 1}, 2: {ID: 2}},
+		rng:       func() *rand.Rand { return r },
+	}
+	due := []srs.State{{QuestionID: 1}, {QuestionID: 2}}
+	for i := range 100 {
+		q := svc.pickDueAvoid(context.Background(), due, 1, r)
+		if q == nil {
+			t.Fatalf("trial %d: got nil, want q2 (有効候補があるのに nil は不可)", i)
+		}
+		if q.ID != 2 {
+			t.Fatalf("trial %d: got qID=%d, want 2 (lastQID=1 は回避)", i, q.ID)
+		}
+	}
+}
+
+// due が lastQID しか含まない場合はそれを返す (連続出題を許容)。
+func TestPickDueAvoidReturnsLastWhenOnlyCandidate(t *testing.T) {
+	t.Parallel()
+	r := rand.New(rand.NewPCG(23, 24))
+	svc := &QuizService{
+		questions: mapQuestionsRepo{1: {ID: 1}},
+		rng:       func() *rand.Rand { return r },
+	}
+	q := svc.pickDueAvoid(context.Background(), []srs.State{{QuestionID: 1}}, 1, r)
+	if q == nil || q.ID != 1 {
+		t.Fatalf("got %v, want qID=1 (唯一の due 候補)", q)
+	}
+}
+
+// 参照先の問題がすべて取得できない場合は nil (次の枠へフォールバック)。
+func TestPickDueAvoidNilWhenQuestionsMissing(t *testing.T) {
+	t.Parallel()
+	r := rand.New(rand.NewPCG(25, 26))
+	svc := &QuizService{
+		questions: mapQuestionsRepo{},
+		rng:       func() *rand.Rand { return r },
+	}
+	due := []srs.State{{QuestionID: 8}, {QuestionID: 9}}
+	if q := svc.pickDueAvoid(context.Background(), due, 1, r); q != nil {
+		t.Fatalf("got %v, want nil (全候補の問題が欠落)", q)
+	}
+}
+
+// pickRandomAvoid は lastQID を決して返さない (他候補がある場合)。
+func TestPickRandomAvoidNeverPicksLast(t *testing.T) {
+	t.Parallel()
+	r := rand.New(rand.NewPCG(27, 28))
+	all := []domain.Question{{ID: 1}, {ID: 2}, {ID: 3}}
+	for i := range 300 {
+		q := pickRandomAvoid(all, 2, r)
+		if q.ID == 2 {
+			t.Fatalf("trial %d: picked lastQID=2 (回避されるべき)", i)
+		}
+	}
+}
+
+// 候補がすべて lastQID の場合 (要素 1 個/重複) は lastQID を返す。
+func TestPickRandomAvoidReturnsLastWhenNoOtherOption(t *testing.T) {
+	t.Parallel()
+	r := rand.New(rand.NewPCG(29, 30))
+	single := []domain.Question{{ID: 5}}
+	if q := pickRandomAvoid(single, 5, r); q.ID != 5 {
+		t.Fatalf("single: got %d, want 5", q.ID)
+	}
+	dup := []domain.Question{{ID: 5}, {ID: 5}}
+	if q := pickRandomAvoid(dup, 5, r); q.ID != 5 {
+		t.Fatalf("dup: got %d, want 5", q.ID)
+	}
+}
+
 // pickSequential はセット照会/最終回答照会の失敗を呼び出し元へ伝播する。
 func TestPickSequentialPropagatesErrors(t *testing.T) {
 	t.Parallel()

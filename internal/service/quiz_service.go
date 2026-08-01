@@ -179,13 +179,21 @@ func pickCandidate(all []domain.Question, r *rand.Rand, cond func(*domain.Questi
 	return cands[r.IntN(len(cands))]
 }
 
-// pickDueAvoid は due から lastQID 以外を 1 件返す (見つからなければ nil)。
+// pickDueAvoid は due のうち lastQID 以外を優先して等確率で 1 件返す。
+// due が lastQID しか含まない場合はそれを返す (連続出題を許容)。
+// 参照先の問題が取得できない場合は引き直し、全滅なら nil。
 func (s *QuizService) pickDueAvoid(ctx context.Context, due []srs.State, lastQID int64, r *rand.Rand) *domain.Question {
-	for range due {
-		st := due[r.IntN(len(due))]
-		if st.QuestionID == lastQID && len(due) > 1 {
-			continue
+	cands := make([]srs.State, 0, len(due))
+	for _, st := range due {
+		if st.QuestionID != lastQID {
+			cands = append(cands, st)
 		}
+	}
+	if len(cands) == 0 {
+		cands = due
+	}
+	for range cands {
+		st := cands[r.IntN(len(cands))]
 		if q, err := s.questions.GetByID(ctx, st.QuestionID); err == nil {
 			return q
 		}
@@ -193,16 +201,11 @@ func (s *QuizService) pickDueAvoid(ctx context.Context, due []srs.State, lastQID
 	return nil
 }
 
-// pickRandomAvoid は all から lastQID 以外を 1 件返す (要素 1 個なら lastQID を返す)。
+// pickRandomAvoid は all から lastQID 以外を等確率で 1 件返す。
+// 候補が無い (全要素が lastQID) 場合は全体から返す。
 func pickRandomAvoid(all []domain.Question, lastQID int64, r *rand.Rand) *domain.Question {
-	if len(all) == 1 {
-		return &all[0]
-	}
-	for range 10 {
-		idx := r.IntN(len(all))
-		if all[idx].ID != lastQID {
-			return &all[idx]
-		}
+	if q := pickCandidate(all, r, func(q *domain.Question) bool { return q.ID != lastQID }); q != nil {
+		return q
 	}
 	return &all[r.IntN(len(all))]
 }
