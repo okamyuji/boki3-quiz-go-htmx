@@ -1,0 +1,39 @@
+# boki3-quizのデプロイ用composeです。feedflowと同じEC2に同居し、
+# 前段のnginx (feedflowのcomposeプロジェクトが所有) から共有ネットワーク経由で到達されます。
+# そのためここではポートをホストへ公開せず、feedflow_internalネットワークへ参加するだけにします。
+#
+# サービス名はDNS衝突を避けるためappではなくboki3-appにします
+# (feedflow側のappサービスと同一ネットワークに同居するため)。
+services:
+  boki3-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # TARGETARCHはBuildKitがビルドホストのarchを自動設定します (EC2はarm64)。
+      # ハードコードするとホストarch変更時にexec format errorで壊れるため指定しません。
+    image: boki3-quiz:${BOKI3_VERSION:-dev}
+    restart: unless-stopped
+    # 1GB RAMのt4g.microをfeedflowと共有するため、メモリ暴走で同居アプリを
+    # 巻き込まないよう上限を設けます。
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    environment:
+      BOKI3_LISTEN: ":8080"
+      BOKI3_DB_PATH: "/data/boki3-quiz.db"
+      BOKI3_JWT_SECRET: "${BOKI3_JWT_SECRET:?set BOKI3_JWT_SECRET}"
+      BOKI3_COOKIE_SECURE: "true"
+    volumes:
+      # feedflowのデータ用EBS (/mnt/feedflow-data) 配下にboki3専用ディレクトリを持ちます。
+      - /mnt/feedflow-data/boki3:/data
+    expose:
+      - "8080"
+    networks:
+      - feedflow_internal
+
+networks:
+  # feedflowのcomposeプロジェクトが作成する既存ネットワークへ参加します。
+  # ローカル開発でこのcomposeは起動せず、go run ./cmd/boki3-quiz を使ってください。
+  feedflow_internal:
+    external: true
