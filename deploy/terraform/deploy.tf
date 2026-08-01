@@ -127,7 +127,7 @@ resource "null_resource" "deploy" {
 
       # nginx confをドロップインします。検証失敗時は直前の正常なconfへロールバックし、
       # 無効なファイルを共有conf.dへ残さないことでfeedflowのnginx再起動を壊さないようにします。
-      "test -f /etc/feedflow/conf.d/boki3.conf && sudo cp /etc/feedflow/conf.d/boki3.conf /home/ec2-user/boki3.conf.bak || true",
+      "if test -f /etc/feedflow/conf.d/boki3.conf; then sudo cp /etc/feedflow/conf.d/boki3.conf /home/ec2-user/boki3.conf.bak; fi",
       "sudo cp /home/ec2-user/boki3.cloudflare.conf /etc/feedflow/conf.d/boki3.conf",
       "if ! (cd /home/ec2-user/feedflow && sudo docker compose -f compose.yml -f compose.override.yml exec -T nginx nginx -t); then if [ -f /home/ec2-user/boki3.conf.bak ]; then sudo cp /home/ec2-user/boki3.conf.bak /etc/feedflow/conf.d/boki3.conf; else sudo rm -f /etc/feedflow/conf.d/boki3.conf; fi; echo 'nginx config validation failed; boki3.conf rolled back' >&2; exit 1; fi",
       "rm -f /home/ec2-user/boki3.conf.bak",
@@ -135,7 +135,7 @@ resource "null_resource" "deploy" {
 
       # 起動状態とアプリの実応答を確認します。appコンテナのIPへホストから直接healthzを叩きます。
       "cd /home/ec2-user/boki3 && sudo docker compose ps",
-      "cd /home/ec2-user/boki3 && APP_CID=$(sudo docker compose ps -q boki3-app) && APP_IP=$(sudo docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \"$APP_CID\") && curl -fsS -m 10 --retry 5 --retry-delay 2 --retry-connrefused -o /dev/null \"http://$APP_IP:8080/healthz\"",
+      "cd /home/ec2-user/boki3 && APP_CID=$(sudo docker compose ps -q boki3-app | head -n1) && APP_IP=$(sudo docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \"$APP_CID\") && curl -fsS -m 10 --retry 5 --retry-delay 2 --retry-connrefused -o /dev/null \"http://$APP_IP:8080/healthz\"",
     ]
   }
 }
