@@ -37,3 +37,5 @@ e2e/playwright/node_modules/
 e2e/playwright/test-results/
 e2e/playwright/playwright-report/
 e2e/playwright/playwright/.cache/
+deploy/terraform/tfplan
+deploy/terraform/*.tfplan
