@@ -21,16 +21,19 @@ import (
 )
 
 func main() {
-	if err := run(); err != nil {
+	if err := run(os.Args[1:]); err != nil {
 		slog.Error("seed loader failed", "err", err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
-	dbPath := flag.String("db", "boki3-quiz.db", "SQLite DB path")
-	force := flag.Bool("force", false, "Wipe topics/sets/questions/question_set_members before seeding")
-	flag.Parse()
+func run(args []string) error {
+	fs := flag.NewFlagSet("seed-loader", flag.ContinueOnError)
+	dbPath := fs.String("db", "boki3-quiz.db", "SQLite DB path")
+	force := fs.Bool("force", false, "Wipe topics/sets/questions/question_set_members before seeding")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
 
 	db, err := sqlitex.Open("file:" + *dbPath)
 	if err != nil {

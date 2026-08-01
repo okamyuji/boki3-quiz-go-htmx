@@ -32,13 +32,17 @@ import (
 )
 
 func main() {
-	if err := run(); err != nil {
+	// シグナル配線は main が持ち、run は ctx を seam として受ける (テスト容易性)。
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	err := run(ctx)
+	stop()
+	if err != nil {
 		slog.Error("server terminated", "err", err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
+func run(ctx context.Context) error {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
 
@@ -119,7 +123,7 @@ func run() error {
 	webH := web.NewHandler(web.Config{
 		Templates: tpl,
 		Auth:      authSvc, Quiz: quizSvc, Stats: statsSvc,
-		Sets: sets, Questions: questions, Topics: topics, Logger: logger,
+		Sets: sets, Prefs: reposqlite.NewUserPrefsRepo(db), Questions: questions, Topics: topics, Logger: logger,
 		LoginRateLimit: loginRL, GlobalRateLimit: globalRL,
 		Cookie:          cookieCfg,
 		StartedAtSecret: jwtSecret, // JWT 秘密と同じ秘密を流用 (どちらも環境変数管理)
@@ -167,9 +171,6 @@ func run() error {
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	errCh := make(chan error, 1)
 	go func() {
