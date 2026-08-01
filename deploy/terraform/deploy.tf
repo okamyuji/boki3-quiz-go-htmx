@@ -97,6 +97,9 @@ resource "null_resource" "deploy" {
     inline = [
       "set -eux",
 
+      # 転送直後の一時秘密鍵の権限を最初に絞ります (fileプロビジョナは既定umaskで書くため)。
+      "chmod 600 /home/ec2-user/boki3.key",
+
       # 前提確認: feedflowのネットワークとnginxコンテナが稼働中であることを先に検証します。
       "sudo docker network inspect feedflow_internal >/dev/null",
       "cd /home/ec2-user/feedflow && sudo docker compose -f compose.yml -f compose.override.yml ps --services --status running | grep -qx nginx",

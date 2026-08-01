@@ -46,4 +46,5 @@ variable "access_owner_email" {
   description = "Cloudflare Accessで通過を許可する所有者のメールアドレスです。"
   type        = string
   default     = "owner@example.com"
+  sensitive   = true
 }
