@@ -69,12 +69,17 @@ a:focus-visible {
 }
 
 .topbar {
+  /* mobile-first: 狭幅ではブランドとナビを縦積みにし、640px以上で横並びへ */
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr;
+  row-gap: var(--space-sm);
   align-items: center;
   padding: var(--space-md) var(--space-lg);
   border-bottom: 1px solid var(--color-line);
   background: var(--color-paper-2);
+}
+@media (min-width: 640px) {
+  .topbar { grid-template-columns: 1fr auto; }
 }
 .brand {
   font-family: var(--font-serif);
@@ -104,6 +109,7 @@ a:focus-visible {
   display: flex;
   gap: var(--space-md);
   align-items: center;
+  flex-wrap: wrap;
 }
 .nav a { color: var(--color-ink-soft); border-bottom-color: transparent; }
 .nav a:hover { color: var(--color-vermilion); }
@@ -330,7 +336,10 @@ input, select, textarea, button, option {
   margin-top: var(--space-md);
 }
 
+/* 狭幅では表を横スクロールさせ、はみ出しや不格好な折返しを防ぐ */
+.tbl-wrap { overflow-x: auto; }
 .tbl { width: 100%; border-collapse: collapse; }
+.tbl th, .tbl td { white-space: nowrap; }
 .tbl th, .tbl td { padding: var(--space-sm) var(--space-md); text-align: left; border-bottom: 1px solid var(--color-line); }
 .tbl th { background: var(--color-paper-2); font-weight: 600; }
 .tbl .ok { color: oklch(48% 0.16 150); font-weight: 700; }

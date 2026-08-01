@@ -6,6 +6,7 @@
     <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
     <button class="btn danger" type="submit" onclick="return confirm('すべての履歴と SRS 状態を削除します。よろしいですか？')">すべて削除</button>
   </form>
+  <div class="tbl-wrap">
   <table class="tbl">
     <thead><tr><th>日時 (UTC)</th><th>正誤</th><th>所要 (ms)</th><th></th></tr></thead>
     <tbody>
@@ -24,6 +25,7 @@
     {{end}}
     </tbody>
   </table>
+  </div>
   {{else}}
   <p class="muted">履歴はまだありません。</p>
   {{end}}
