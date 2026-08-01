@@ -51,12 +51,13 @@ resource "null_resource" "bundle" {
 }
 
 resource "null_resource" "deploy" {
-  # バンドル内容や証明書やnginx confが変わると再実行します。
+  # バンドル内容や証明書やnginx confや接続先EIPが変わると再実行します。
   triggers = {
     bundle_hash = local.bundle_hash
     cert_id     = cloudflare_origin_ca_certificate.origin.id
     hostname    = var.hostname
     nginx_conf  = sha256(local.nginx_conf)
+    origin_ip   = var.origin_public_ip
   }
 
   depends_on = [null_resource.bundle]
@@ -96,9 +97,9 @@ resource "null_resource" "deploy" {
     inline = [
       "set -eux",
 
-      # 前提確認: feedflowのネットワークとnginxコンテナが存在することを先に検証します。
+      # 前提確認: feedflowのネットワークとnginxコンテナが稼働中であることを先に検証します。
       "sudo docker network inspect feedflow_internal >/dev/null",
-      "cd /home/ec2-user/feedflow && sudo docker compose -f compose.yml -f compose.override.yml ps nginx | grep -q nginx",
+      "cd /home/ec2-user/feedflow && sudo docker compose -f compose.yml -f compose.override.yml ps --services --status running | grep -qx nginx",
 
       # データディレクトリを用意します。コンテナはdistroless nonroot (uid/gid 65532) で動きます。
       "sudo mkdir -p /mnt/feedflow-data/boki3",
@@ -113,6 +114,7 @@ resource "null_resource" "deploy" {
       "test -f /home/ec2-user/boki3.env || printf 'BOKI3_JWT_SECRET=%s\\n' \"$(openssl rand -hex 64)\" > /home/ec2-user/boki3.env",
       "chmod 600 /home/ec2-user/boki3.env",
       "cp /home/ec2-user/boki3.env /home/ec2-user/boki3/.env",
+      "chmod 600 /home/ec2-user/boki3/.env",
 
       # ビルドして起動します。
       "cd /home/ec2-user/boki3 && sudo docker compose --env-file .env up -d --build",
@@ -123,13 +125,17 @@ resource "null_resource" "deploy" {
       "sudo chmod 600 /etc/feedflow/tls/boki3.key",
       "rm -f /home/ec2-user/boki3.crt /home/ec2-user/boki3.key",
 
-      # nginx confをドロップインし、構文検証してからreloadします。
+      # nginx confをドロップインします。検証失敗時は直前の正常なconfへロールバックし、
+      # 無効なファイルを共有conf.dへ残さないことでfeedflowのnginx再起動を壊さないようにします。
+      "test -f /etc/feedflow/conf.d/boki3.conf && sudo cp /etc/feedflow/conf.d/boki3.conf /home/ec2-user/boki3.conf.bak || true",
       "sudo cp /home/ec2-user/boki3.cloudflare.conf /etc/feedflow/conf.d/boki3.conf",
-      "cd /home/ec2-user/feedflow && sudo docker compose -f compose.yml -f compose.override.yml exec -T nginx nginx -t",
+      "if ! (cd /home/ec2-user/feedflow && sudo docker compose -f compose.yml -f compose.override.yml exec -T nginx nginx -t); then if [ -f /home/ec2-user/boki3.conf.bak ]; then sudo cp /home/ec2-user/boki3.conf.bak /etc/feedflow/conf.d/boki3.conf; else sudo rm -f /etc/feedflow/conf.d/boki3.conf; fi; echo 'nginx config validation failed; boki3.conf rolled back' >&2; exit 1; fi",
+      "rm -f /home/ec2-user/boki3.conf.bak",
       "cd /home/ec2-user/feedflow && sudo docker compose -f compose.yml -f compose.override.yml exec -T nginx nginx -s reload",
 
-      # 起動状態を確認します。
+      # 起動状態とアプリの実応答を確認します。appコンテナのIPへホストから直接healthzを叩きます。
       "cd /home/ec2-user/boki3 && sudo docker compose ps",
+      "cd /home/ec2-user/boki3 && APP_CID=$(sudo docker compose ps -q boki3-app) && APP_IP=$(sudo docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \"$APP_CID\") && curl -fsS -m 10 --retry 5 --retry-delay 2 --retry-connrefused -o /dev/null \"http://$APP_IP:8080/healthz\"",
     ]
   }
 }

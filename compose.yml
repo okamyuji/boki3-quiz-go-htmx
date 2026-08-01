@@ -9,8 +9,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        TARGETARCH: arm64
+      # TARGETARCHはBuildKitがビルドホストのarchを自動設定します (EC2はarm64)。
+      # ハードコードするとホストarch変更時にexec format errorで壊れるため指定しません。
     image: boki3-quiz:${BOKI3_VERSION:-dev}
     restart: unless-stopped
     environment:

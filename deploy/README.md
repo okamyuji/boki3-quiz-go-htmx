@@ -22,6 +22,7 @@ feedflow (feedflow-go-htmx) が使用中の既存EC2に同居する構成です�
 
 - feedflow側のterraformが適用済みで、EC2 / nginx / `feedflow_internal` ネットワーク / `/mnt/feedflow-data` が稼働していること
 - ローカルに feedflow リポジトリがあり、`deploy/terraform/feedflow_ssh_key.pem` が存在すること
+- **実行元のグローバルIPがfeedflowのセキュリティグループのSSH許可CIDRと一致していること。** feedflowのSGは「feedflow側で最後に `terraform apply` した時点のグローバルIP/32」だけにSSHを許可しています。ネットワークが変わっている場合、boki3のapplyはSSH接続タイムアウトで失敗します。その場合は先にfeedflow側で `terraform apply` を実行してSGの許可CIDRを現在のIPへ更新してください。
 
 ## 手順
 
@@ -40,7 +41,7 @@ apply後、`terraform output app_url` のURLへアクセスし、Cloudflare Acce
 
 ## 再デプロイ
 
-コード変更後に `terraform apply` を再実行すると、バンドルのチェックサム差分を検知して再転送・再ビルド・再起動します。
+コード変更後に `terraform apply` を再実行すると、バンドルのチェックサム差分を検知して再転送・再ビルド・再起動します。コード変更なしで強制的に再デプロイしたい場合は `terraform taint null_resource.deploy && terraform apply` を使います。
 
 ## 注意
 
