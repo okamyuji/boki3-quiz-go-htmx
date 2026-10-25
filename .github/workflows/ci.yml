@@ -52,10 +52,16 @@ jobs:
         with:
           python-version: "3.12"
 
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: e2e/playwright/package.json
+
       - name: Set up Node
         uses: actions/setup-node@v5
         with:
           node-version: "24"
+          cache: pnpm
+          cache-dependency-path: e2e/playwright/pnpm-lock.yaml
 
       - name: Install staticcheck
         run: go install honnef.co/go/tools/cmd/staticcheck@latest
@@ -102,10 +108,16 @@ jobs:
           check-latest: true
           cache: true
 
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: e2e/playwright/package.json
+
       - name: Set up Node
         uses: actions/setup-node@v5
         with:
           node-version: "24"
+          cache: pnpm
+          cache-dependency-path: e2e/playwright/pnpm-lock.yaml
 
       - name: Install staticcheck
         run: go install honnef.co/go/tools/cmd/staticcheck@latest
@@ -132,12 +144,12 @@ jobs:
       - name: Install Playwright deps
         working-directory: e2e/playwright
         run: |
-          npm ci
-          npx playwright install --with-deps chromium
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
 
       - name: Run Playwright E2E
         working-directory: e2e/playwright
-        run: npm test
+        run: pnpm test
 
       - name: Upload Playwright report
         if: always()

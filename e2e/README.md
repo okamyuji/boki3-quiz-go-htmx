@@ -12,16 +12,16 @@
 
 ```bash
 cd e2e/playwright
-npm install
-npm run install:browsers   # chromium だけ取得
+pnpm install
+pnpm run install:browsers   # chromium だけ取得
 ```
 
 ## 実行
 
 ```bash
 cd e2e/playwright
-npm test                   # ヘッドレス
-npm run test:headed        # 画面付き
+pnpm test                   # ヘッドレス
+pnpm run test:headed        # 画面付き
 ```
 
 `playwright.config.ts` の `webServer` が
@@ -37,7 +37,7 @@ npm run test:headed        # 画面付き
 実行後 `e2e/playwright/playwright-report/` に HTML レポートと JSON 結果が生成されます。
 
 ```bash
-npx playwright show-report
+pnpm exec playwright show-report
 ```
 
 失敗時は同ディレクトリにスクリーンショット / 動画 / トレース zip が残ります。
@@ -61,7 +61,7 @@ GitHub Actions では `e2e/playwright/playwright.config.ts` を以下のよう�
 - name: Playwright
   run: |
     cd e2e/playwright
-    npm ci
-    npx playwright install --with-deps chromium
-    npm test
+    pnpm install --frozen-lockfile
+    pnpm exec playwright install --with-deps chromium
+    pnpm test
 ```
